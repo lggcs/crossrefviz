@@ -484,6 +484,20 @@
                     count: v.count,
                     targetTheme: v.targetTheme
                 })) : [];
+
+                // Count refs at verse level for histogram
+                ch.verseRefs = [];
+                for (let v = 1; v <= ch.verseCount; v++) {
+                    const ref = `${ch.book} ${ch.chapter}:${v}`;
+                    const verseRefList = (crossRefs[ref] || []).filter(r => r.votes >= voteThreshold);
+                    const verseTheme = getVerseTheme(ch.book, ch.chapter, v);
+                    ch.verseRefs.push({
+                        verseIndex: v,
+                        refCount: verseRefList.length,
+                        theme: verseTheme.color,
+                        themeName: verseTheme.name
+                    });
+                }
             }
         }
 
@@ -745,18 +759,18 @@
             const visible = getVisibleChapters();
             if (visible.length === 0) return;
 
-            // Layout - arcs take up most space, histogram at bottom
+            // Layout - arcs take up most space, histogram directly below
             const margin = { left: 15, right: 15 };
             const topPadding = 20;
             const bottomPadding = 40;
             const histHeight = Math.min(100, height * 0.15);
-            const labelsHeight = 30;
 
-            const arcAreaHeight = height - topPadding - bottomPadding - histHeight - labelsHeight;
+            // Arcs take up all available space above histogram
+            const arcAreaHeight = height - topPadding - bottomPadding - histHeight;
             const arcTop = topPadding;
             const arcBottom = arcTop + arcAreaHeight;
-            const arcRowY = arcTop + arcAreaHeight * 0.5;  // Center arcs vertically
-            const histTop = arcBottom + labelsHeight;
+            const arcRowY = arcBottom;  // Arcs end at bottom of arc area
+            const histTop = arcBottom;  // Histogram starts right where arcs end
 
             const chapterWidth = (width - margin.left - margin.right) / visible.length;
 
@@ -773,8 +787,16 @@
                 allArcs: []  // Store for hover detection
             };
 
-            // Compute max ref count
-            const maxRef = Math.max(...visible.map(c => c.refCount), 1);
+            // Compute max ref count at verse level for histogram scaling
+            let maxVerseRefCount = 0;
+            visible.forEach(c => {
+                c.verseRefs.forEach(vr => {
+                    if (vr.refCount > maxVerseRefCount) {
+                        maxVerseRefCount = vr.refCount;
+                    }
+                });
+            });
+            const maxRef = Math.max(maxVerseRefCount, 1);
 
             // Draw reference line for arcs
             ctx.strokeStyle = '#374151';
@@ -1029,28 +1051,61 @@
                 }
             }
 
-            // Draw histogram at bottom
+            // Draw histogram inverted (verse-level bars hang down from arc line)
             visible.forEach((c, i) => {
-                const x = margin.left + i * chapterWidth;
-                const barHeight = (c.refCount / maxRef) * histHeight;
-                const y = histTop + histHeight - barHeight;
+                const chWidth = chapterWidth;
 
-                // Create gradient based on chapter theme
-                const gradient = ctx.createLinearGradient(x, y, x, histTop + histHeight);
-                const theme = c.theme;
-                gradient.addColorStop(0, theme.color);
-                gradient.addColorStop(1, theme.color + '40');  // Add transparency
+                // Draw verse-level bars
+                c.verseRefs.forEach(vr => {
+                    if (vr.refCount === 0) return;  // Skip verses with no refs
 
-                ctx.fillStyle = gradient;
-                ctx.fillRect(x, y, chapterWidth - 1, barHeight);
+                    // Check if this verse matches the active theme filter
+                    let themeOpacity = 1.0;
+                    if (activeTheme) {
+                        // Use the stored theme name directly
+                        themeOpacity = vr.themeName === activeTheme ? 1.0 : 0.15;
+                    }
 
-                // Top border for bar
-                ctx.strokeStyle = theme.color + '60';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(x, y, chapterWidth - 1, barHeight);
+                    // Calculate bar width (evenly distributed across verse count)
+                    // Using a small gap between bars
+                    const barWidth = Math.max(1, (chWidth / c.verseCount) - 0.5);
+                    const verseX = margin.left + i * chWidth + (vr.verseIndex - 1) * (chWidth / c.verseCount) + 0.25;
+
+                    // Calculate bar height
+                    const barHeight = (vr.refCount / maxRef) * histHeight;
+                    const y = histTop;  // Bars start at top of histogram area (arc line level)
+
+                    // Only draw if theme opacity is significant
+                    if (themeOpacity < 0.1) return;
+
+                    // Create gradient based on verse theme - top is solid, bottom is transparent
+                    const gradient = ctx.createLinearGradient(verseX, y, verseX, y + barHeight);
+
+                    // Apply theme opacity to the gradient
+                    const hexColor = vr.theme;
+                    const rgb = hexToRgb(hexColor);
+                    const fadedColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${0.8 * themeOpacity})`;
+                    const transparentColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${0.25 * themeOpacity})`;
+
+                    gradient.addColorStop(0, fadedColor);
+                    gradient.addColorStop(1, transparentColor);  // Add transparency at bottom
+
+                    ctx.globalAlpha = themeOpacity;
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(verseX, y, barWidth, barHeight);
+
+                    // Top border for bar (at arc line level) - only for bars with significant height
+                    if (barHeight >= 2) {
+                        ctx.strokeStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${0.38 * themeOpacity})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.strokeRect(verseX, y, barWidth, barHeight);
+                    }
+                });
+
+                ctx.globalAlpha = 1.0;  // Reset alpha
             });
 
-            // Histogram baseline
+            // Histogram baseline (at bottom of histogram bars)
             ctx.strokeStyle = '#4b5563';
             ctx.lineWidth = 1;
             ctx.beginPath();
