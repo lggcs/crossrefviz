@@ -100,11 +100,14 @@
             <!-- Bible Difficulties Section -->
             <div class="border-t border-gray-700 bg-gray-800/50">
                 <div class="px-3 py-2 flex items-center justify-between">
-                    <h3 class="text-xs font-semibold text-gray-400 uppercase">Bible Difficulties</h3>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-xs font-semibold text-gray-400 uppercase">Bible Difficulties</h3>
+                        <span id="bible-diff-filter-label" class="text-xs text-blue-400 hidden">(<span id="bible-diff-book-label">Book</span>)</span>
+                    </div>
                     <div class="flex items-center gap-2">
                         <label class="text-xs text-gray-500">Search:</label>
                         <input type="text" id="bible-diff-search" placeholder="Search questions..."
-                               class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                               class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 w-32 sm:w-40 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
                 <div id="bible-diff-list" class="px-3 pb-3 max-h-48 overflow-y-auto text-xs space-y-1">
@@ -284,8 +287,19 @@
                 console.log('Loading Bible difficulties...');
                 try {
                     const bd = await fetch('bible_difficulties.json');
-                    window.bibleDifficulties = await bd.json();
-                    console.log(`Loaded ${window.bibleDifficulties.length} Bible difficulties`);
+                    const rawData = await bd.json();
+
+                    // Remove duplicates based on URL
+                    const seenUrls = new Set();
+                    window.bibleDifficulties = rawData.filter(article => {
+                        if (seenUrls.has(article.url)) {
+                            return false;
+                        }
+                        seenUrls.add(article.url);
+                        return true;
+                    });
+
+                    console.log(`Loaded ${window.bibleDifficulties.length} unique Bible difficulties (was ${rawData.length})`);
                 } catch (e) {
                     console.warn('Could not load bible_difficulties.json:', e);
                     window.bibleDifficulties = [];
@@ -609,14 +623,31 @@
             const searchInput = document.getElementById('bible-diff-search');
             searchInput.oninput = (e) => {
                 const query = e.target.value.toLowerCase();
-                const filtered = window.bibleDifficulties.filter(article =>
+
+                // search within the filtered list (based on active book or all)
+                let searchWithin = window.bibleDifficulties;
+                if (activeBook) {
+                    // Search within book-filtered articles
+                    searchWithin = searchWithin.filter(article => {
+                        let articleBook = 'Unknown';
+                        const match = article.title.match(/^(.+?)\s+\d+(?::|—)/);
+                        if (match) {
+                            articleBook = match[1].trim();
+                            if (articleBook === 'Psalm') articleBook = 'Psalms';
+                        }
+                        const normalizedBook = activeBook === 'Psalm' ? 'Psalms' : activeBook;
+                        return articleBook.toLowerCase() === normalizedBook.toLowerCase();
+                    });
+                }
+
+                const filtered = searchWithin.filter(article =>
                     article.title.toLowerCase().includes(query)
                 );
-                window.renderBibleDifficulties(filtered);
+                window.renderBibleDifficulties(filtered, true); // Skip dedup since source is already filtered
             };
         }
 
-        window.renderBibleDifficulties = function(articles) {
+        window.renderBibleDifficulties = function(articles, skipDedup = false) {
             const container = document.getElementById('bible-diff-list');
 
             if (articles.length === 0) {
@@ -624,13 +655,38 @@
                 return;
             }
 
+            // Remove duplicates based on URL (skip if already deduplicated)
+            let uniqueArticles = articles;
+            if (!skipDedup) {
+                const seenUrls = new Set();
+                uniqueArticles = articles.filter(article => {
+                    if (seenUrls.has(article.url)) {
+                        return false;
+                    }
+                    seenUrls.add(article.url);
+                    return true;
+                });
+            }
+
             // Limit to first 100 to avoid overwhelming the DOM
-            const displayArticles = articles.slice(0, 100);
+            const displayArticles = uniqueArticles.slice(0, 100);
 
             container.innerHTML = displayArticles.map(article => {
-                // Extract book name from title (e.g., "Matthew 1:8—..." -> "Matthew")
-                const bookMatch = article.title.match(/^([A-Za-z]+\s?\d*\s?[A-Za-z]*)/);
-                const book = bookMatch ? bookMatch[1].trim() : 'Unknown';
+                // Extract book name from title - handle various formats
+                // e.g., "1 Chronicles 10:14—..." -> "1 Chronicles"
+                //      "Matthew 1:8—..." -> "Matthew"
+                //      "Psalms 119:1—..." -> "Psalms"
+                //      "Song of Solomon 1:1—..." -> "Song of Solomon"
+                let book = 'Unknown';
+                // Match book name before first chapter reference
+                // "1 Chronicles 10:14—..." -> "1 Chronicles"
+                // "Song of Solomon 1:1—..." -> "Song of Solomon"
+                const match = article.title.match(/^(.+?)\s+\d+(?::|—)/);
+                if (match) {
+                    book = match[1].trim();
+                    // Fix common variations
+                    if (book === 'Psalm') book = 'Psalms';  // Normalize to Psalms
+                }
 
                 return `
                     <a href="${article.url}" target="_blank"
@@ -643,13 +699,35 @@
                 `;
             }).join('');
 
-            if (articles.length > 100) {
+            if (uniqueArticles.length > 100) {
                 container.innerHTML += `
                     <p class="text-gray-500 text-center py-2 text-[10px]">
-                        Showing 100 of ${articles.length} questions. Search for specific topics.
+                        Showing 100 of ${uniqueArticles.length} questions. Search for specific topics.
                     </p>
                 `;
             }
+        };
+
+        window.renderBibleDifficultiesByBook = function(book) {
+            if (!window.bibleDifficulties || window.bibleDifficulties.length === 0) {
+                window.renderBibleDifficulties([]);
+                return;
+            }
+
+            // Normalize book name (handle e.g., "Psalm" vs "Psalms")
+            const normalizedBook = book === 'Psalm' ? 'Psalms' : book;
+
+            const filtered = window.bibleDifficulties.filter(article => {
+                let articleBook = 'Unknown';
+                const match = article.title.match(/^(.+?)\s+\d+(?::|—)/);
+                if (match) {
+                    articleBook = match[1].trim();
+                    if (articleBook === 'Psalm') articleBook = 'Psalms';
+                }
+                return articleBook.toLowerCase() === normalizedBook.toLowerCase();
+            });
+
+            window.renderBibleDifficulties(filtered, true); // Skip dedup since already filtered from deduplicated list
         };
 
         function selectBook(book) {
@@ -663,10 +741,25 @@
                 const bookChapters = chapters.filter(c => c.book === activeBook);
                 currentChapterView = bookChapters[0]; // Show first chapter
                 showDetails(currentChapterView);
+
+                // Filter Bible difficulties for this book
+                window.renderBibleDifficultiesByBook(activeBook);
+
+                // Show filter label
+                document.getElementById('bible-diff-filter-label').classList.remove('hidden');
+                document.getElementById('bible-diff-book-label').textContent = activeBook;
+                document.getElementById('bible-diff-search').placeholder = `Search in ${activeBook}...`;
             } else {
                 currentChapterView = null;
                 document.getElementById('detail-content').innerHTML =
                     '<p class="text-gray-500">Click on a chapter to see details</p>';
+
+                // Show all Bible difficulties when no book is selected
+                window.renderBibleDifficulties(window.bibleDifficulties || []);
+
+                // Hide filter label
+                document.getElementById('bible-diff-filter-label').classList.add('hidden');
+                document.getElementById('bible-diff-search').placeholder = 'Search questions...';
             }
             render();
         }
