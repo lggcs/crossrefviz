@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSK Cross-Reference Visualization</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+        }
+        #viz-container {
+            position: relative;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .tooltip {
+            position: fixed;
+            background: rgba(17, 24, 39, 0.95);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 200px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .sidebar-book {
+            transition: background-color 0.15s;
+        }
+        .sidebar-book:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .sidebar-book.active {
+            background-color: rgba(59, 130, 246, 0.2);
+            border-left: 3px solid #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+            <h1 class="text-base sm:text-lg font-bold text-blue-400">TSK Bible Cross-References</h1>
+            <span class="text-xs text-gray-400 hidden sm:inline">
+                <span id="stats">Loading...</span>
+            </span>
+        </div>
+        <div class="flex items-center gap-2 sm:gap-4">
+            <div class="flex items-center gap-1 sm:gap-2">
+                <label class="text-xs text-gray-400">Votes:</label>
+                <input type="range" id="vote-threshold" min="1" max="50" value="5" 
+                       class="w-20 sm:w-24 h-2 bg-gray-700 rounded-lg cursor-pointer">
+                <span id="vote-value" class="text-xs w-6">5</span>
+            </div>
+            <div class="flex items-center gap-1 sm:gap-2">
+                <label class="text-xs text-gray-400">Arcs:</label>
+                <input type="range" id="arc-limit" min="100" max="3000" value="500" step="100"
+                       class="w-20 sm:w-24 h-2 bg-gray-700 rounded-lg cursor-pointer">
+                <span id="arc-value" class="text-xs w-8">500</span>
+            </div>
+            <input type="text" id="search-input" placeholder="Search..." 
+                   class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 w-24 sm:w-36 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+    </header>
+
+    <!-- Main -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-40 sm:w-56 bg-gray-800 border-r border-gray-700 flex flex-col flex-shrink-0">
+            <div class="p-2 border-b border-gray-700">
+                <h2 class="text-xs font-semibold text-gray-400 uppercase">Themes</h2>
+            </div>
+            <div id="theme-filter" class="p-1 space-y-0.5 text-xs">
+                <!-- Populated by JS -->
+            </div>
+            <div class="p-2 border-b border-gray-700 border-t">
+                <h2 class="text-xs font-semibold text-gray-400 uppercase">Books</h2>
+            </div>
+            <div id="book-list" class="flex-1 overflow-y-auto p-1 space-y-0.5 text-xs">
+                <!-- Populated by JS -->
+            </div>
+        </aside>
+
+        <!-- Visualization -->
+        <main class="flex-1 flex flex-col overflow-hidden bg-gray-900">
+            <div id="viz-container" class="flex-1 relative">
+                <canvas id="main-canvas"></canvas>
+            </div>
+            <div id="status-bar" class="h-8 bg-gray-800 border-t border-gray-700 px-3 flex items-center text-xs text-gray-400">
+                Hover over the visualization to explore
+            </div>
+            <footer class="h-6 bg-gray-800 border-t border-gray-700 px-3 flex items-center justify-center text-[10px] text-gray-500 flex-shrink-0">
+                Cross-references from <a href="https://openbible.info/labs/cross-references/" class="text-blue-400 hover:text-blue-300" target="_blank">openbible.info</a> (CC BY 4.0) • KJV text from <a href="https://github.com/farskipper/kjv" class="text-blue-400 hover:text-blue-300" target="_blank">farskipper/kjv</a>
+            </footer>
+        </main>
+
+        <!-- Detail Panel -->
+        <aside class="w-64 sm:w-72 bg-gray-800 border-l border-gray-700 flex flex-col flex-shrink-0 hidden sm:flex">
+            <div class="p-2 border-b border-gray-700">
+                <h2 class="text-xs font-semibold text-gray-400 uppercase">Details</h2>
+            </div>
+            <div id="detail-content" class="flex-1 overflow-y-auto p-2 text-xs">
+                <p class="text-gray-500">Click on a chapter to see details</p>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <p class="text-gray-400 text-sm">Loading data...</p>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="tooltip" class="tooltip hidden"></div>
+
+    <script>
+        // Simple state
+        let verseTexts = {};
+        let crossRefs = {};
+        let versePositions = {};
+        let chapters = [];
+        let activeBook = null;
+        let voteThreshold = 5;
+        let arcLimit = 500;
+        let searchQuery = '';
+        let hoveredArc = null;
+        let mouseX = 0, mouseY = 0;
+        let verseThemes = {};  // Rainbow Bible theme mapping
+
+        // State
+        let activeTheme = null;  // Filter by theme
+        let selectedArc = null;  // Currently selected arc from click
+        let currentChapterView = null;  // Currently displayed chapter in details panel
+        
+        // Canvas
+        let canvas, ctx;
+        let width, height;
+        
+        // Pre-aggregated chapter data
+        let chapterData = []; // { book, chapter, index, x, refCount, refs: [{toIndex, votes}] }
+
+        // Helper to normalize book names for verse lookup
+        // BOOK_NAMES uses "Psalm" but verses-1769.json uses "Psalms"
+        function normalizeBookNameForText(book) {
+            // Handle Psalm/Psalms inconsistency
+            if (book === 'Psalm') return 'Psalms';
+            if (book === 'Psalms') return 'Psalm';
+            return book;
+        }
+
+        // Helper to get verse text, handling book name normalization
+        function getVerseText(ref) {
+            // Try the reference as-is first
+            if (verseTexts[ref]) return verseTexts[ref];
+            // Try with normalized book name
+            const parts = ref.split(' ');
+            const book = parts[0];
+            const rest = parts.slice(1).join(' ');
+            const normalizedBook = normalizeBookNameForText(book);
+            if (normalizedBook !== book) {
+                const normalizedRef = `${normalizedBook} ${rest}`;
+                return verseTexts[normalizedRef];
+            }
+            return null;
+        }
+
+        const BOOK_NAMES = [
+            "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges", "Ruth",
+            "1 Samuel", "2 Samuel", "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah",
+            "Esther", "Job", "Psalm", "Proverbs", "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
+            "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos", "Obadiah", "Jonah",
+            "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi",
+            "Matthew", "Mark", "Luke", "John", "Acts", "Romans", "1 Corinthians", "2 Corinthians",
+            "Galatians", "Ephesians", "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians", "1 Timothy", "2 Timothy",
+            "Titus", "Philemon", "Hebrews", "James", "1 Peter", "2 Peter", "1 John", "2 John",
+            "3 John", "Jude", "Revelation"
+        ];
+
+        // Rainbow Bible theme colors (default - will be loaded from verse_themes.json)
+        let RAINBOW_THEMES = {
+            'God': { name: 'God', color: '#A020F0' },
+            'Discipleship': { name: 'Discipleship', color: '#FA8072' },
+            'Love': { name: 'Love', color: '#008000' },
+            'Faith': { name: 'Faith', color: '#FFB347' },
+            'Sin': { name: 'Sin', color: '#808080' },
+            'Evil': { name: 'Evil', color: '#8B4513' },
+            'Salvation': { name: 'Salvation', color: '#0000FF' },
+            'Family': { name: 'Family', color: '#FFFF00' },
+            'Outreach': { name: 'Outreach', color: '#FFC0CB' },
+            'Commandments': { name: 'Commandments', color: '#808000' },
+            'History': { name: 'History', color: '#C0C0C0' },
+            'Prophecy': { name: 'Prophecy', color: '#FFD700' }
+        };
+
+        const THEME_ORDER = ['God', 'Discipleship', 'Love', 'Faith', 'Sin', 'Evil',
+                           'Salvation', 'Family', 'Outreach', 'Commandments', 'History', 'Prophecy'];
+
+        // Color interpolation for gradient arcs
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => {
+                const hex = Math.round(x).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        }
+
+        function lerpColor(color1, color2, t) {
+            const rgb1 = hexToRgb(color1);
+            const rgb2 = hexToRgb(color2);
+            if (!rgb1 || !rgb2) return color1;
+
+            return rgbToHex(
+                rgb1.r + (rgb2.r - rgb1.r) * t,
+                rgb1.g + (rgb2.g - rgb1.g) * t,
+                rgb1.b + (rgb2.b - rgb1.b) * t
+            );
+        }
+
+        async function init() {
+            canvas = document.getElementById('main-canvas');
+            ctx = canvas.getContext('2d', { alpha: false });
+            
+            try {
+                // Load data
+                console.log('Loading verses...');
+                const rv = await fetch('verses-1769.json');
+                verseTexts = await rv.json();
+
+                console.log('Loading refs...');
+                const rr = await fetch('openbible.json');
+                const refsData = await rr.json();
+                crossRefs = refsData.cross_references;
+
+                console.log('Loading Rainbow Bible themes...');
+                const tr = await fetch('verse_themes.json');
+                const themeData = await tr.json();
+                verseThemes = themeData.verse_themes;
+
+                // Load theme colors from JSON if available
+                if (themeData.rainbow_themes) {
+                    // Convert array format to object lookup
+                    RAINBOW_THEMES = {};
+                    themeData.rainbow_themes.forEach(t => {
+                        RAINBOW_THEMES[t.name] = {name: t.name, color: t.color};
+                    });
+                    console.log('Loaded theme colors from JSON:', RAINBOW_THEMES);
+                }
+
+                console.log('Building structure...');
+                buildStructure();
+                
+                // Update stats
+                const totalVerses = Object.keys(verseTexts).length;
+                const totalRefs = Object.values(crossRefs).reduce((a, b) => a + b.length, 0);
+                document.getElementById('stats').textContent = 
+                    `${totalVerses.toLocaleString()} verses, ${totalRefs.toLocaleString()} refs`;
+                
+                // Build UI
+                buildThemeFilter();
+                buildBookList();
+                resize();
+                setupEvents();
+                
+                document.getElementById('loading').style.display = 'none';
+                render();
+                
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loading').innerHTML = 
+                    `<p class="text-red-400">Error: ${e.message}</p>`;
+            }
+        }
+
+        function getChapterTheme(book, chapter) {
+            // Get theme from Rainbow Bible classification
+            // Aggregate themes for all verses in this chapter
+            let themeCounts = {};
+            let v = 1;
+            let totalVerses = 0;
+
+            while (verseTexts[`${book} ${chapter}:${v}`]) {
+                const verseRef = `${book} ${chapter}:${v}`;
+                const theme = verseThemes[verseRef];
+                if (theme && theme !== 'unknown') {
+                    themeCounts[theme] = (themeCounts[theme] || 0) + 1;
+                }
+                totalVerses++;
+                v++;
+            }
+
+            // Return dominant theme
+            if (Object.keys(themeCounts).length === 0) {
+                // Fallback to 'God' theme
+                return RAINBOW_THEMES['God'];
+            }
+
+            const dominantTheme = Object.entries(themeCounts)
+                .sort((a, b) => b[1] - a[1])[0][0];
+
+            return RAINBOW_THEMES[dominantTheme] || RAINBOW_THEMES['God'];
+        }
+
+        function getVerseTheme(book, chapter, verse) {
+            const verseRef = `${book} ${chapter}:${verse}`;
+            const theme = verseThemes[verseRef];
+            if (theme && theme !== 'unknown' && RAINBOW_THEMES[theme]) {
+                return RAINBOW_THEMES[theme];
+            }
+            // Fallback to chapter theme
+            return getChapterTheme(book, chapter);
+        }
+
+        function buildStructure() {
+            let verseIdx = 0;
+            let chapterIdx = 0;
+
+            // Build chapters array with themes and verse ranges
+            for (const book of BOOK_NAMES) {
+                const lookupBook = normalizeBookNameForText(book);  // Use normalized name for verse text lookup
+                let ch = 1;
+                while (true) {
+                    const firstVerse = `${lookupBook} ${ch}:1`;
+                    if (!verseTexts[firstVerse]) break;
+
+                    let v = 1;
+                    let chapterVerseCount = 0;
+                    while (verseTexts[`${lookupBook} ${ch}:${v}`]) {
+                        // Store verse position using BOOK_NAMES book ("Psalm")
+                        const ref = `${book} ${ch}:${v}`;
+                        versePositions[ref] = {
+                            verseIdx,
+                            chapterIdx,
+                            verseIndex: v - 1,  // 0-based verse index in chapter
+                            chapterVerseCount: null  // Will fill after loop
+                        };
+                        verseIdx++;
+                        chapterVerseCount++;
+                        v++;
+                    }
+
+                    // Update chapterVerseCount for all verses in this chapter
+                    for (let i = 1; i <= chapterVerseCount; i++) {
+                        versePositions[`${book} ${ch}:${i}`].chapterVerseCount = chapterVerseCount;
+                    }
+
+                    const theme = getChapterTheme(book, ch);
+                    chapters.push({
+                        book,
+                        chapter: ch,
+                        index: chapterIdx,
+                        theme: theme,
+                        verseCount: chapterVerseCount,
+                        startVerseIndex: verseIdx - chapterVerseCount,
+                        endVerseIndex: verseIdx
+                    });
+                    chapterIdx++;
+                    ch++;
+                }
+            }
+
+            // Build verse-level arcs
+            let verseArcs = [];
+
+            for (const [source, refs] of Object.entries(crossRefs)) {
+                // Normalize source reference
+                const sourcePos = versePositions[source];
+                if (!sourcePos) continue;
+
+                for (const ref of refs) {
+                    // Normalize target reference
+                    const targetPos = versePositions[ref.to];
+                    if (!targetPos) continue;
+
+                    verseArcs.push({
+                        sourcePos,
+                        targetPos,
+                        votes: ref.votes,
+                        sourceChapter: chapters[sourcePos.chapterIdx],
+                        targetChapter: chapters[targetPos.chapterIdx],
+                        sourceRef: source,
+                        targetRef: ref.to
+                    });
+                }
+            }
+
+            // Sort arcs by votes and limit to top N per chapter pair for performance
+            // Group by chapter pairs
+            const chapterPairArcs = {};
+            for (const arc of verseArcs) {
+                const key = `${arc.sourcePos.chapterIdx}-${arc.targetPos.chapterIdx}`;
+                if (!chapterPairArcs[key]) {
+                    chapterPairArcs[key] = [];
+                }
+                chapterPairArcs[key].push(arc);
+            }
+
+            // Keep top 5 arcs per chapter pair (highest voted)
+            let filteredArcs = [];
+            for (const [key, arcs] of Object.entries(chapterPairArcs)) {
+                arcs.sort((a, b) => b.votes - a.votes);
+                filteredArcs.push(...arcs.slice(0, 5));
+            }
+
+            // Sort all arcs globally by votes
+            filteredArcs.sort((a, b) => b.votes - a.votes);
+            window.verseArcs = filteredArcs;
+
+            // Aggregate cross-refs by chapter (for legacy support)
+            for (const [source, refs] of Object.entries(crossRefs)) {
+                const pos = versePositions[source];
+                if (!pos) continue;
+
+                for (const ref of refs) {
+                    const targetPos = versePositions[ref.to];
+                    if (!targetPos) continue;
+
+                    const chapter = chapters[pos.chapterIdx];
+                    const targetCh = chapters[targetPos.chapterIdx];
+
+                    if (!chapter.refs) {
+                        chapter.refs = {};
+                    }
+                    const key = targetPos.chapterIdx;
+                    if (!chapter.refs[key]) {
+                        chapter.refs[key] = { votes: 0, count: 0, targetTheme: targetCh.theme };
+                    }
+                    chapter.refs[key].votes += ref.votes;
+                    chapter.refs[key].count++;
+                }
+            }
+
+            // Compute ref counts
+            for (const ch of chapters) {
+                ch.refCount = ch.refs ? Object.keys(ch.refs).length : 0;
+                ch.refsArray = ch.refs ? Object.entries(ch.refs).map(([k, v]) => ({
+                    toIndex: parseInt(k),
+                    votes: v.votes,
+                    count: v.count,
+                    targetTheme: v.targetTheme
+                })) : [];
+            }
+        }
+
+        function buildThemeFilter() {
+            const container = document.getElementById('theme-filter');
+            container.innerHTML = `
+                <button onclick="setThemeFilter(null)"
+                        class="w-full text-left px-2 py-1 rounded ${!activeTheme ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}">
+                    All Themes
+                </button>
+            `;
+
+            for (const themeKey of THEME_ORDER) {
+                const theme = RAINBOW_THEMES[themeKey];
+                const isActive = activeTheme === themeKey;
+                container.innerHTML += `
+                    <button onclick="setThemeFilter('${themeKey}')"
+                            class="w-full text-left px-2 py-1 rounded flex items-center gap-2 ${isActive ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}">
+                        <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${theme.color}"></span>
+                        <span>${theme.name}</span>
+                    </button>
+                `;
+            }
+        }
+
+        // Draw an arc with gradient: source color (0-70%) blending to target color (70-100%)
+        function drawGradientArc(ctx, arc, opacity, isHovered) {
+            const dx = Math.abs(arc.x2 - arc.x1);
+            const lineWidth = isHovered ? 7 : Math.max(1, Math.min(3, arc.votes / 10));
+
+            const midX = (arc.x1 + arc.x2) / 2;
+            const curveHeight = Math.min(dx * 0.75, arc.height * 1.3);
+            const ctrlY = arc.y - curveHeight;
+
+            // Create gradient along the arc path
+            const gradient = ctx.createLinearGradient(arc.x1, arc.y, arc.x2, arc.y);
+            gradient.addColorStop(0, arc.sourceColor);  // Source color at start
+            gradient.addColorStop(0.7, arc.sourceColor);  // Still source color at 70%
+            gradient.addColorStop(1, arc.targetColor);  // Target color at end
+
+            ctx.globalAlpha = opacity;
+
+            if (isHovered) {
+                ctx.shadowColor = arc.sourceColor;
+                ctx.shadowBlur = 25;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+            }
+
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = lineWidth;
+            ctx.beginPath();
+            ctx.moveTo(arc.x1, arc.y);
+            ctx.quadraticCurveTo(midX, ctrlY, arc.x2, arc.y);
+            ctx.stroke();
+
+            if (isHovered) {
+                ctx.shadowBlur = 0;
+            }
+
+            ctx.globalAlpha = 1;
+        }
+
+        window.setThemeFilter = function(theme) {
+            activeTheme = theme;
+            buildThemeFilter();
+            render();
+        };
+
+        function buildBookList() {
+            const list = document.getElementById('book-list');
+            list.innerHTML = '';
+            
+            const bookStarts = {};
+            chapters.forEach(ch => {
+                if (!bookStarts[ch.book]) {
+                    bookStarts[ch.book] = { start: ch.index, end: ch.index, count: 0 };
+                }
+                bookStarts[ch.book].end = ch.index;
+                bookStarts[ch.book].count++;
+            });
+            
+            for (const book of BOOK_NAMES) {
+                if (!bookStarts[book]) continue;
+                const div = document.createElement('div');
+                div.className = 'sidebar-book p-2 rounded cursor-pointer';
+                div.dataset.book = book;
+                div.innerHTML = `
+                    <div class="font-medium truncate">${book}</div>
+                    <div class="text-xs text-gray-400">${bookStarts[book].count} ch</div>
+                `;
+                div.onclick = () => selectBook(book);
+                list.appendChild(div);
+            }
+        }
+
+        function selectBook(book) {
+            activeBook = activeBook === book ? null : book;
+            document.querySelectorAll('.sidebar-book').forEach(el => {
+                el.classList.toggle('active', el.dataset.book === activeBook);
+            });
+
+            // Update current chapter view
+            if (activeBook) {
+                const bookChapters = chapters.filter(c => c.book === activeBook);
+                currentChapterView = bookChapters[0]; // Show first chapter
+                showDetails(currentChapterView);
+            } else {
+                currentChapterView = null;
+                document.getElementById('detail-content').innerHTML =
+                    '<p class="text-gray-500">Click on a chapter to see details</p>';
+            }
+            render();
+        }
+
+        function resize() {
+            const container = document.getElementById('viz-container');
+            width = container.clientWidth;
+            height = container.clientHeight;
+            canvas.width = width * window.devicePixelRatio;
+            canvas.height = height * window.devicePixelRatio;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            render();
+        }
+
+        function setupEvents() {
+            document.getElementById('vote-threshold').oninput = (e) => {
+                voteThreshold = parseInt(e.target.value);
+                document.getElementById('vote-value').textContent = voteThreshold;
+
+                // Refresh details panel if a chapter is active
+                if (currentChapterView) {
+                    showDetails(currentChapterView);
+                }
+                render();
+            };
+            document.getElementById('arc-limit').oninput = (e) => {
+                arcLimit = parseInt(e.target.value);
+                document.getElementById('arc-value').textContent = arcLimit;
+                render();
+            };
+            let searchTimeout;
+            document.getElementById('search-input').oninput = (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    searchQuery = e.target.value.toLowerCase();
+                    render();
+                }, 200);
+            };
+            window.onresize = () => { resize(); };
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                // Store in CSS pixels (same coordinates used for arc calculations)
+                mouseX = e.clientX - rect.left;
+                mouseY = e.clientY - rect.top;
+                handleHover(e);
+                updateHover();
+            });
+            canvas.addEventListener('click', handleClick);
+        }
+
+        function getVisibleChapters() {
+            let startIdx = 0, endIdx = chapters.length - 1;
+
+            if (activeBook) {
+                for (let ch of chapters) {
+                    if (ch.book === activeBook) {
+                        startIdx = ch.index;
+                        break;
+                    }
+                }
+                for (let i = chapters.length - 1; i >= 0; i--) {
+                    if (chapters[i].book === activeBook) {
+                        endIdx = i;
+                        break;
+                    }
+                }
+            }
+
+            if (searchQuery) {
+                const matches = chapters.filter(c =>
+                    `${c.book} ${c.chapter}`.toLowerCase().includes(searchQuery)
+                );
+                if (matches.length > 0) {
+                    const positions = matches.map(c => c.index);
+                    startIdx = Math.min(...positions);
+                    endIdx = Math.max(...positions);
+                }
+            }
+
+            // Return all visible chapters - we handle theme filtering visually in render
+            return chapters.slice(startIdx, endIdx + 1);
+        }
+
+        function render() {
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(0, 0, width, height);
+
+            const visible = getVisibleChapters();
+            if (visible.length === 0) return;
+
+            // Layout - arcs take up most space, histogram at bottom
+            const margin = { left: 15, right: 15 };
+            const topPadding = 20;
+            const bottomPadding = 40;
+            const histHeight = Math.min(100, height * 0.15);
+            const labelsHeight = 30;
+
+            const arcAreaHeight = height - topPadding - bottomPadding - histHeight - labelsHeight;
+            const arcTop = topPadding;
+            const arcBottom = arcTop + arcAreaHeight;
+            const arcRowY = arcTop + arcAreaHeight * 0.5;  // Center arcs vertically
+            const histTop = arcBottom + labelsHeight;
+
+            const chapterWidth = (width - margin.left - margin.right) / visible.length;
+
+            // Store layout for interaction
+            window.layout = {
+                visible,
+                chapterWidth,
+                margin,
+                arcTop,
+                arcBottom,
+                arcRowY,
+                histTop,
+                histHeight,
+                allArcs: []  // Store for hover detection
+            };
+
+            // Compute max ref count
+            const maxRef = Math.max(...visible.map(c => c.refCount), 1);
+
+            // Draw reference line for arcs
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(margin.left, arcRowY);
+            ctx.lineTo(width - margin.right, arcRowY);
+            ctx.stroke();
+
+            // Compute chapter positions
+            visible.forEach((c, i) => {
+                const x = margin.left + i * chapterWidth + chapterWidth / 2;
+                c.x = x;
+
+                // Store normalized position for hover detection
+                c.layoutX = x / window.devicePixelRatio;
+            });
+
+            // Draw arcs using verse-level arcs
+            ctx.globalAlpha = 0.3;
+
+            let allArcs = [];
+
+            // Get visible chapter indices
+            const visibleIndices = new Set(visible.map(ch => ch.index));
+
+            // Filter verse arcs to those where either source or target is visible
+            let visibleArcs = [];
+            for (const arc of window.verseArcs || []) {
+                if (arc.votes < voteThreshold) continue;
+
+                const sourceVisible = visibleIndices.has(arc.sourcePos.chapterIdx);
+                const targetVisible = visibleIndices.has(arc.targetPos.chapterIdx);
+
+                // Only show arcs where target is visible (for TO visualization)
+                if (!targetVisible) continue;
+
+                visibleArcs.push({
+                    ...arc,
+                    sourceVisible,
+                    targetVisible
+                });
+            }
+
+            // Sort by votes and limit
+            visibleArcs.sort((a, b) => b.votes - a.votes);
+
+            const adaptiveArcLimit = visible.length < 20 ? arcLimit * 3 : arcLimit;
+            visibleArcs = visibleArcs.slice(0, adaptiveArcLimit);
+
+            // Calculate x positions for each verse arc
+            for (const arc of visibleArcs) {
+                // Calculate source X
+                const sourceChIdx = arc.sourcePos.chapterIdx;
+                const sourceCh = arc.sourceChapter;
+
+                let sourceX;
+                const sourceVisibleIdx = visible.findIndex(v => v.index === sourceChIdx);
+                if (sourceVisibleIdx !== -1) {
+                    // Source is visible - calculate precise verse position
+                    const chWidth = chapterWidth;
+                    const verseOffset = (arc.sourcePos.verseIndex / sourceCh.verseCount) * chWidth;
+                    sourceX = margin.left + sourceVisibleIdx * chWidth + verseOffset;
+                } else {
+                    // Source is off-screen - approximate position
+                    const fullWidth = width - margin.left - margin.right;
+                    const chapterStep = fullWidth / chapters.length;
+                    sourceX = margin.left + sourceChIdx * chapterStep + chapterStep / 2;
+                    sourceX = Math.max(0, Math.min(width, sourceX));
+                }
+
+                // Calculate target X (always use precise verse position)
+                const targetChIdx = arc.targetPos.chapterIdx;
+                const targetCh = arc.targetChapter;
+                const targetVisibleIdx = visible.findIndex(v => v.index === targetChIdx);
+                const chWidth = chapterWidth;
+                const verseOffset = (arc.targetPos.verseIndex / targetCh.verseCount) * chWidth;
+                const targetX = margin.left + targetVisibleIdx * chWidth + verseOffset;
+
+                allArcs.push({
+                    x1: sourceX,
+                    x2: targetX,
+                    y: arcRowY,
+                    height: arcAreaHeight * 0.5,
+                    votes: arc.votes,
+                    sourceColor: getVerseTheme(sourceCh.book, sourceCh.chapter, arc.sourcePos.verseIndex + 1).color,
+                    targetColor: getVerseTheme(targetCh.book, targetCh.chapter, arc.targetPos.verseIndex + 1).color,
+                    sourceTheme: getVerseTheme(sourceCh.book, sourceCh.chapter, arc.sourcePos.verseIndex + 1),
+                    targetTheme: getVerseTheme(targetCh.book, targetCh.chapter, arc.targetPos.verseIndex + 1),
+                    fromChapter: sourceCh,
+                    toChapter: targetCh,
+                    sourceRef: arc.sourceRef,
+                    targetRef: arc.targetRef,
+                    fromVisible: arc.sourceVisible,
+                    sourceVerseIdx: arc.sourcePos.verseIndex,
+                    targetVerseIdx: arc.targetPos.verseIndex,
+                    sourcePos: arc.sourcePos,
+                    targetPos: arc.targetPos
+                });
+            }
+
+            window.layout.allArcs = allArcs;
+
+            // Determine which arcs to draw last (on top)
+            const hoveredArcToDrawLast = hoveredArc;
+            const isAnyHovered = !!hoveredArc;
+            const isAnySelected = !!selectedArc;
+
+            for (const arc of allArcs) {
+                // Skip hovered/selected arcs - we'll draw them last
+                if (arc === hoveredArcToDrawLast || arc === selectedArc) continue;
+
+                const dx = Math.abs(arc.x2 - arc.x1);
+                const minDrawDist = 10; // Minimum horizontal distance to draw
+                if (dx < minDrawDist) continue;
+
+                // Calculate base opacity
+                let baseOpacity = arc.fromVisible ? 0.4 : 0.25;
+
+                // When a theme filter is active, boost arcs FROM that theme
+                if (activeTheme) {
+                    const fromMatchesTheme = arc.sourceTheme.name === activeTheme;
+                    const toMatchesTheme = arc.targetTheme.name === activeTheme;
+
+                    if (fromMatchesTheme) {
+                        baseOpacity = 0.7;  // Much more prominent
+                    } else if (toMatchesTheme) {
+                        baseOpacity = 0.5;  // Moderately visible
+                    } else {
+                        baseOpacity = 0.05;  // Fade almost completely
+                    }
+                }
+
+                // Fade all arcs more if something is hovered or selected
+                if ((isAnyHovered || isAnySelected) && arc !== hoveredArcToDrawLast && arc !== selectedArc) {
+                    baseOpacity *= 0.15;
+                }
+
+                drawGradientArc(ctx, arc, baseOpacity, false);
+            }
+
+            ctx.globalAlpha = 1;
+
+            // Draw selected arc (if any)
+            if (selectedArc) {
+                const arc = selectedArc;
+                const dx = Math.abs(arc.x2 - arc.x1);
+                if (dx >= 10) {
+                    drawGradientArc(ctx, arc, 0.85, true);
+                }
+            }
+
+            // Draw hovered arc on top (before other UI, we'll redraw highlighted ticks after)
+            if (hoveredArcToDrawLast) {
+                const arc = hoveredArcToDrawLast;
+                const dx = Math.abs(arc.x2 - arc.x1);
+                if (dx >= 10) { // Only draw if sufficient distance
+                    drawGradientArc(ctx, arc, 1.0, true);
+
+                    // Redraw highlighted tick marks on top of the hovered arc
+                    visible.forEach((c, i) => {
+                        const hoveredSourceX = hoveredArcToDrawLast.x1;
+                        const hoveredTargetX = hoveredArcToDrawLast.x2;
+                        const myX = c.x;
+                        const isHighlighted =
+                            Math.abs(hoveredSourceX - myX) < chapterWidth / 2 ||
+                            Math.abs(hoveredTargetX - myX) < chapterWidth / 2;
+
+                        if (isHighlighted) {
+                            ctx.beginPath();
+                            ctx.moveTo(c.x, arcRowY);
+                            ctx.lineTo(c.x, arcRowY + 4);
+                            // Use source color for gradient arcs
+                            ctx.strokeStyle = hoveredArcToDrawLast.sourceColor;
+                            ctx.lineWidth = 2.5;
+                            ctx.stroke();
+                        }
+                    });
+                }
+            }
+
+            // Draw labels - show arc-specific labels when hovering/selected, otherwise book/chapter labels
+            const isArcHovered = !!hoveredArc;
+            const isArcSelected = !!selectedArc;
+
+            // Use selected arc for labels if present, otherwise hovered arc
+            const arcForLabels = selectedArc || hoveredArc;
+            const shouldShowArcLabels = isArcSelected || isArcHovered;
+
+            if (shouldShowArcLabels) {
+                // Draw labels for the arc's endpoints
+                const font = '10px sans-serif';
+                const yOffset = arcRowY + 20;  // Below the baseline
+
+                ctx.font = font;
+                ctx.textAlign = 'center';
+
+                // Parse source reference: "Book Chapter:Verse" e.g., "Genesis 1:1"
+                const sourceParts = arcForLabels.sourceRef.split(' ');
+                const sourceBook = sourceParts[0];
+                const sourceChVerse = sourceParts.slice(1).join(' ');  // "1:1"
+                const [sourceCh, sourceVerse] = sourceChVerse.split(':');
+
+                ctx.fillStyle = arcForLabels.sourceColor;
+
+                ctx.shadowColor = '#111827';
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+
+                // Show book name on top, chapter:verse below
+                ctx.fillText(sourceBook, arcForLabels.x1, yOffset);
+                ctx.font = '9px sans-serif';
+                ctx.fillText(`${sourceCh}:${sourceVerse}`, arcForLabels.x1, yOffset + 11);
+
+                // Parse target reference
+                const targetParts = arcForLabels.targetRef.split(' ');
+                const targetBook = targetParts[0];
+                const targetChVerse = targetParts.slice(1).join(' ');  // "1:1"
+                const [targetCh, targetVerse] = targetChVerse.split(':');
+
+                ctx.fillStyle = arcForLabels.targetColor;
+                ctx.font = font;
+
+                ctx.fillText(targetBook, arcForLabels.x2, yOffset);
+                ctx.font = '9px sans-serif';
+                ctx.fillText(`${targetCh}:${targetVerse}`, arcForLabels.x2, yOffset + 11);
+
+                ctx.shadowBlur = 0;  // Reset shadow
+            } else {
+                // Default book labels - show only 5 key books for scale reference
+                const scaleBooks = ['Genesis', ['Psalm', 'Psalms'], 'Isaiah', 'Matthew', 'Revelation'];
+                ctx.fillStyle = '#9ca3af';
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'center';
+
+                let lastBook = '';
+                let lastScaleIdx = -1;
+
+                for (const ch of visible) {
+                    if (ch.book !== lastBook) {
+                        // Check if this book matches any of the scale books
+                        const scaleIdx = scaleBooks.findIndex(sb =>
+                            typeof sb === 'string' ? sb === ch.book : sb.includes(ch.book)
+                        );
+                        if (scaleIdx !== -1 && scaleIdx > lastScaleIdx) {
+                            ctx.fillText(ch.book, ch.x, arcRowY + 35);
+                            lastScaleIdx = scaleIdx;
+                        }
+                        lastBook = ch.book;
+                    }
+                }
+            }
+
+            // Draw histogram at bottom
+            visible.forEach((c, i) => {
+                const x = margin.left + i * chapterWidth;
+                const barHeight = (c.refCount / maxRef) * histHeight;
+                const y = histTop + histHeight - barHeight;
+
+                // Create gradient based on chapter theme
+                const gradient = ctx.createLinearGradient(x, y, x, histTop + histHeight);
+                const theme = c.theme;
+                gradient.addColorStop(0, theme.color);
+                gradient.addColorStop(1, theme.color + '40');  // Add transparency
+
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x, y, chapterWidth - 1, barHeight);
+
+                // Top border for bar
+                ctx.strokeStyle = theme.color + '60';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, chapterWidth - 1, barHeight);
+            });
+
+            // Histogram baseline
+            ctx.strokeStyle = '#4b5563';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(margin.left, histTop + histHeight);
+            ctx.lineTo(width - margin.right, histTop + histHeight);
+            ctx.stroke();
+
+            document.getElementById('status-bar').textContent =
+                `${visible.length} chapters, ${allArcs.length} arcs shown`;
+        }
+
+        function handleHover(e) {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio;
+            const x = (e.clientX - rect.left) * dpr;  // Canvas coordinates
+            const y = (e.clientY - rect.top) * dpr;
+
+            const layout = window.layout;
+            if (!layout) return;
+
+            // Find chapter - layout.margin.left and layout.chapterWidth are in canvas coordinates
+            const idx = Math.floor((x - layout.margin.left) / layout.chapterWidth);
+            if (idx >= 0 && idx < layout.visible.length) {
+                const ch = layout.visible[idx];
+                document.getElementById('status-bar').innerHTML =
+                    `<span class="text-blue-400">${ch.book} ${ch.chapter}</span> • ${ch.refCount} refs • Click for details`;
+            }
+        }
+
+        function handleClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;  // CSS pixels
+            const y = e.clientY - rect.top;   // CSS pixels
+
+            const layout = window.layout;
+            if (!layout) return;
+
+            // First check if we clicked on an arc
+            const clickedArc = findArcAtPosition(x, y);
+            if (clickedArc) {
+                selectedArc = clickedArc;
+                // Focus on the source chapter of the selected arc
+                currentChapterView = chapters[clickedArc.sourcePos.chapterIdx];
+                showDetails(currentChapterView);
+                render(); // Re-render to show arc selection
+                return;
+            }
+
+            // Otherwise, check if we clicked on a chapter
+            const idx = Math.floor((x - layout.margin.left) / layout.chapterWidth);
+            if (idx >= 0 && idx < layout.visible.length) {
+                selectedArc = null; // Clear arc selection
+                currentChapterView = layout.visible[idx];
+                showDetails(currentChapterView);
+                render();
+            }
+        }
+
+        function findArcAtPosition(x, y) {
+            const layout = window.layout;
+            if (!layout || !layout.allArcs) return null;
+
+            const maxDistance = 15; // pixels - tighter tolerance for clicking
+
+            for (const arc of layout.allArcs) {
+                const dx = Math.abs(arc.x2 - arc.x1);
+                if (dx < 5) continue;
+
+                const midX = (arc.x1 + arc.x2) / 2;
+                const curveHeight = Math.min(dx * 0.75, arc.height * 1.3);
+                const ctrlY = arc.y - curveHeight;
+
+                // Quick bounding box check
+                const arcMaxDist = maxDistance + 10;
+                const minX = Math.min(arc.x1, arc.x2) - arcMaxDist;
+                const maxX = Math.max(arc.x1, arc.x2) + arcMaxDist;
+                const minY = arc.y - curveHeight - arcMaxDist;
+                const maxY = arc.y + arcMaxDist;
+
+                if (x < minX || x > maxX || y < minY || y > maxY) continue;
+
+                // Sample the arc
+                const sampleCount = Math.min(Math.max(Math.floor(dx / 3), 30), 120);
+
+                for (let t = 0; t <= 1; t += 1 / sampleCount) {
+                    const t1 = (1 - t) * (1 - t);
+                    const t2 = 2 * (1 - t) * t;
+                    const t3 = t * t;
+
+                    const curveX = t1 * arc.x1 + t2 * midX + t3 * arc.x2;
+                    const curveY = t1 * arc.y + t2 * ctrlY + t3 * arc.y;
+
+                    const dist = Math.sqrt(Math.pow(x - curveX, 2) + Math.pow(y - curveY, 2));
+
+                    if (dist <= maxDistance) {
+                        return arc;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        function showDetails(chapter) {
+            const panel = document.getElementById('detail-content');
+
+            // Get all verses in this chapter with their cross-references
+            const chapterVerses = [];
+            let v = 1;
+
+            // Use normalized book name to find verses
+            const lookupBook = normalizeBookNameForText(chapter.book);
+
+            while (verseTexts[`${lookupBook} ${chapter.chapter}:${v}`]) {
+                const ref = `${chapter.book} ${chapter.chapter}:${v}`;
+                const verseRefs = (crossRefs[ref] || []).filter(r => r.votes >= voteThreshold);
+
+                if (verseRefs.length > 0) {
+                    // Get verse text using helper for normalization
+                    const text = getVerseText(ref) || '';
+
+                    // Count incoming refs (filtered by vote threshold)
+                    let incomingCount = 0;
+                    const incomingRefs = [];
+                    for (const [source, refs] of Object.entries(crossRefs)) {
+                        if (refs && refs.length > 0) {
+                            const sourcePos = versePositions[source];
+                            if (sourcePos && sourcePos.chapterIdx === chapter.index) {
+                                const incomingForVerse = refs.filter(r => r.to === ref && r.votes >= voteThreshold);
+                                incomingCount += incomingForVerse.length;
+                                incomingRefs.push(...incomingForVerse);
+                            }
+                        }
+                    }
+
+                    chapterVerses.push({
+                        ref,
+                        text: text,
+                        outgoingCount: verseRefs.length,
+                        incomingCount: incomingRefs.length,
+                        totalRefs: verseRefs.length + incomingRefs.length,
+                        topRefs: verseRefs.sort((a,b) => b.votes - a.votes),
+                        incomingRefs: incomingRefs
+                    });
+                }
+                v++;
+            }
+
+            // Sort by number of references (descending), but put selected arc's source verse at top
+            if (selectedArc && selectedArc.sourcePos.chapterIdx === chapter.index) {
+                const selectedRef = selectedArc.sourceRef;
+                chapterVerses.sort((a, b) => {
+                    const aIsSelected = a.ref === selectedRef;
+                    const bIsSelected = b.ref === selectedRef;
+                    if (aIsSelected) return -1;
+                    if (bIsSelected) return 1;
+                    return b.totalRefs - a.totalRefs;
+                });
+            } else {
+                chapterVerses.sort((a, b) => b.totalRefs - a.totalRefs);
+            }
+
+            // Get top ref links from chapter level (respect vote threshold)
+            const topRefs = (chapter.refsArray || [])
+                .filter(r => r.votes >= voteThreshold)
+                .sort((a, b) => b.votes - a.votes)
+                .slice(0, 15);
+
+            // Build the selected arc UI if present
+            let selectedArcUI = '';
+            if (selectedArc && selectedArc.sourcePos.chapterIdx === chapter.index) {
+                const sourceText = getVerseText(selectedArc.sourceRef) || 'No text available';
+                const targetText = getVerseText(selectedArc.targetRef) || 'No text available';
+                selectedArcUI = `
+                    <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-3 mb-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="w-3 h-3 rounded-full" style="background-color: ${selectedArc.sourceColor}"></span>
+                            <span class="text-xs font-semibold text-blue-300">Selected Cross-Reference</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div>
+                                <span class="text-green-400 text-sm font-medium">${selectedArc.sourceRef}</span>
+                                <p class="text-gray-300 text-xs mt-1 leading-relaxed">${sourceText}</p>
+                            </div>
+                            <div class="text-center">
+                                <span class="text-gray-500 text-xs">↓ ${selectedArc.votes} votes ↓</span>
+                            </div>
+                            <div>
+                                <span class="text-blue-400 text-sm font-medium">${selectedArc.targetRef}</span>
+                                <p class="text-gray-300 text-xs mt-1 leading-relaxed">${targetText}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            panel.innerHTML = `
+                <div class="space-y-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-blue-400">${chapter.book} ${chapter.chapter}</h3>
+                        <p class="text-gray-400">${chapter.refCount} chapters linked, ${chapterVerses.length} verses with refs</p>
+                    </div>
+
+                    ${selectedArcUI}
+
+                    ${chapterVerses.length > 0 ? `
+                    <div>
+                        <h4 class="text-xs font-semibold text-gray-400 uppercase mb-1">Verses (${chapterVerses.length})</h4>
+                        <div class="space-y-1 max-h-80 overflow-y-auto">
+                            ${chapterVerses.map(v => {
+                                const isSelected = selectedArc && v.ref === selectedArc.sourceRef;
+                                const bgClass = isSelected ? 'bg-blue-800/40 border-blue-600' : 'bg-gray-700 hover:bg-gray-600';
+                                const borderClass = isSelected ? 'border' : '';
+
+                                return `
+                                <div class="${bgClass} ${borderClass} rounded text-xs cursor-pointer transition-colors"
+                                     onclick="toggleVerse(this)">
+                                    <div class="p-2 flex justify-between items-center">
+                                        <div>
+                                            <span class="text-blue-300 font-medium">${v.ref}</span>
+                                            <span class="text-gray-400 ml-2">${v.outgoingCount} out / ${v.incomingCount} in</span>
+                                            ${isSelected ? '<span class="ml-2 text-xs text-blue-400">● Selected</span>' : ''}
+                                        </div>
+                                        <span class="text-gray-500">▼</span>
+                                    </div>
+                                    <div class="hidden p-2 pt-0 border-t border-gray-600 mt-1">
+                                        <p class="text-gray-200 leading-relaxed">${v.text}</p>
+                                        ${v.outgoingCount > 0 ? `
+                                        <div class="mt-2">
+                                            <span class="text-xs text-gray-500">Outbound refs:</span>
+                                            <div class="space-y-0.5 mt-1">
+                                                ${v.topRefs.slice(0, 5).map(r => {
+                                                    const isTargetSelected = selectedArc && r.to === selectedArc.targetRef;
+                                                    const bgClass = isTargetSelected ? 'bg-blue-900/40 text-blue-300' : 'text-gray-400 hover:text-blue-300';
+                                                    return `
+                                                    <div class="${bgClass} cursor-pointer flex justify-between px-1 py-0.5 rounded"
+                                                         onclick="event.stopPropagation(); showVerseDetail('${r.to}')">
+                                                        <span>→ ${r.to}</span>
+                                                        <span class="text-gray-500">${r.votes}v</span>
+                                                    </div>
+                                                `}).join('')}
+                                                ${v.topRefs.length > 5 ? `<div class="text-gray-500 text-xs">+${v.topRefs.length - 5} more</div>` : ''}
+                                            </div>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `}).join('')}
+                        </div>
+                    </div>
+                    ` : '<p class="text-gray-500 text-xs">No verses with cross-references</p>'}
+
+                    ${topRefs.length > 0 ? `
+                    <div>
+                        <h4 class="text-xs font-semibold text-gray-400 uppercase mb-1">Top Linked Chapters</h4>
+                        <div class="space-y-1 max-h-40 overflow-y-auto">
+                            ${topRefs.map(ref => {
+                                const targetCh = chapters.find(c => c.index === ref.toIndex);
+                                if (!targetCh) return '';
+                                return `
+                                    <div class="bg-gray-700 rounded p-2 text-xs">
+                                        <div class="flex justify-between">
+                                            <span class="text-blue-300">${targetCh.book} ${targetCh.chapter}</span>
+                                            <span class="text-gray-400">${ref.votes}v</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        window.toggleVerse = function(element) {
+            const content = element.querySelector('div:last-child');
+            const arrow = element.querySelector('.text-gray-500');
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                arrow.textContent = '▲';
+            } else {
+                content.classList.add('hidden');
+                arrow.textContent = '▼';
+            }
+        };
+
+        window.showVerseDetail = function(ref) {
+            const panel = document.getElementById('detail-content');
+            const text = verseTexts[ref] || 'Not found';
+            const refs = (crossRefs[ref] || [])
+                .filter(r => r.votes >= voteThreshold)
+                .sort((a,b) => b.votes - a.votes);
+            panel.innerHTML = `
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-blue-400">${ref}</h3>
+                        <button onclick="selectBook('${ref.split(' ')[0]}')" class="text-xs text-gray-400 hover:text-blue-300">
+                            View chapter
+                        </button>
+                    </div>
+                    <p class="text-gray-300 text-xs leading-relaxed">${text}</p>
+                    ${refs.length > 0 ? `
+                    <div>
+                        <h4 class="text-xs font-semibold text-gray-400 uppercase mb-1">Cross-References (${refs.length})</h4>
+                        <div class="space-y-1 max-h-60 overflow-y-auto">
+                            ${refs.map(r => `
+                                <div class="bg-gray-700 rounded p-1.5 text-xs flex justify-between items-center cursor-pointer hover:bg-gray-600"
+                                     onclick="showVerseDetail('${r.to}')">
+                                    <span class="text-blue-300">→ ${r.to}</span>
+                                    <span class="text-gray-500 bg-gray-800 px-1.5 rounded">${r.votes}v</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : '<p class="text-gray-500 text-xs">No cross-references above vote threshold</p>'}
+                </div>
+            `;
+        };
+
+        // Check hover over arcs
+        function updateHover() {
+            if (!window.layout || !window.layout.allArcs) return;
+
+            const layout = window.layout;
+
+            const maxDistance = 30; // Maximum distance to consider
+
+            let bestArc = null;
+            let minDistance = Infinity;
+
+            for (const arc of layout.allArcs) {
+                const dx = Math.abs(arc.x2 - arc.x1);
+                if (dx < 5) continue; // Skip very short arcs
+
+                // Pre-calculate curve parameters
+                const midX = (arc.x1 + arc.x2) / 2;
+                const curveHeight = Math.min(dx * 0.75, arc.height * 1.3);
+                const ctrlY = arc.y - curveHeight;
+
+                // Quick bounding box check
+                const arcMaxDist = maxDistance + 20;
+                const minX = Math.min(arc.x1, arc.x2) - arcMaxDist;
+                const maxX = Math.max(arc.x1, arc.x2) + arcMaxDist;
+                const minY = arc.y - curveHeight - arcMaxDist;
+                const maxY = arc.y + arcMaxDist;
+
+                if (mouseX < minX || mouseX > maxX || mouseY < minY || mouseY > maxY) continue;
+
+                // Sample the arc
+                const sampleCount = Math.min(Math.max(Math.floor(dx / 3), 30), 120);
+
+                for (let t = 0; t <= 1; t += 1 / sampleCount) {
+                    const t1 = (1 - t) * (1 - t);
+                    const t2 = 2 * (1 - t) * t;
+                    const t3 = t * t;
+
+                    const curveX = t1 * arc.x1 + t2 * midX + t3 * arc.x2;
+                    const curveY = t1 * arc.y + t2 * ctrlY + t3 * arc.y;
+
+                    const dist = Math.sqrt(Math.pow(mouseX - curveX, 2) + Math.pow(mouseY - curveY, 2));
+
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        bestArc = arc;
+                    }
+
+                    // Early exit if we found something very close
+                    if (dist < 5) break;
+                }
+            }
+
+            const newHoveredArc = (minDistance <= maxDistance) ? bestArc : null;
+
+            if (newHoveredArc !== hoveredArc) {
+                hoveredArc = newHoveredArc;
+                render();
+
+                if (hoveredArc) {
+                    const tooltip = document.getElementById('tooltip');
+                    tooltip.style.left = mouseX + 'px';
+                    tooltip.style.top = (mouseY - 55) + 'px';
+
+                    tooltip.innerHTML = `
+                        <div class="flex items-center gap-1 mb-1">
+                            <span class="w-2 h-2 rounded-full" style="background-color: ${hoveredArc.sourceColor}"></span>
+                            <strong>${hoveredArc.sourceTheme.name}</strong>
+                        </div>
+                        <div class="text-green-400">${hoveredArc.sourceRef}</div>
+                        <div class="text-center text-gray-400 text-xs">↓ ${hoveredArc.votes} votes ↓</div>
+                        <div class="text-blue-400">${hoveredArc.targetRef}</div>
+                    `;
+                    tooltip.classList.remove('hidden');
+                } else {
+                    document.getElementById('tooltip').classList.add('hidden');
+                }
+            }
+        }
+
+            window.onload = init;
+
+            // Animation loop for hover effects
+            function animate() {
+                updateHover();
+                requestAnimationFrame(animate);
+            }
+            animate();
+        </script>
+    </body>
+</html>
