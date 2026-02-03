@@ -888,15 +888,14 @@
             // Layout - arcs take up most space, histogram directly below
             const margin = { left: 15, right: 15 };
             const topPadding = 20;
-            const bottomPadding = 40;
-            const histHeight = Math.min(100, height * 0.15);
 
-            // Arcs take up all available space above histogram
-            const arcAreaHeight = height - topPadding - bottomPadding - histHeight;
+            // Arcs fill most of height, histogram at bottom
+            const arcAreaHeight = height * 0.85;  // 85% for arc area
+            const histHeight = Math.min(100, height * 0.12);  // Up to 12% for histogram
             const arcTop = topPadding;
-            const arcBottom = arcTop + arcAreaHeight;
-            const arcRowY = arcBottom;  // Arcs end at bottom of arc area
-            const histTop = arcBottom;  // Histogram starts right where arcs end
+            const arcBottom = arcTop + arcAreaHeight;  // Bottom of arc area
+            const arcRowY = arcBottom;  // Arc baseline at bottom edge, curves go up
+            const histTop = arcBottom;  // Histogram starts right below arc area
 
             const chapterWidth = (width - margin.left - margin.right) / visible.length;
 
@@ -1006,7 +1005,7 @@
                     x1: sourceX,
                     x2: targetX,
                     y: arcRowY,
-                    height: arcAreaHeight * 0.5,
+                    height: arcAreaHeight * 0.85,  // Use 85% of vertical space
                     votes: arc.votes,
                     sourceColor: getVerseTheme(sourceCh.book, sourceCh.chapter, arc.sourcePos.verseIndex + 1).color,
                     targetColor: getVerseTheme(targetCh.book, targetCh.chapter, arc.targetPos.verseIndex + 1).color,
