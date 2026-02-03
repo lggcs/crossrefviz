@@ -198,6 +198,44 @@
             return null;
         }
 
+        // Parse Bible reference into book, chapter, verse
+        function parseBibleRef(ref) {
+            // Handle formats like "Genesis 1:1", "1 Chronicles 10:14", etc.
+            const match = ref.match(/^\s*(.+?)\s*(\d+):(\d+)\s*$/);
+            if (match) {
+                return {
+                    book: match[1].trim(),
+                    chapter: parseInt(match[2]),
+                    verse: parseInt(match[3])
+                };
+            }
+            return null;
+        }
+
+        // Convert book name to BibleHub format (e.g., "Psalm" -> "psalms", "1 Samuel" -> "1_samuel")
+        function bookToBibleHubFormat(book) {
+            // Normalize common book name variations
+            let normalized = book.toLowerCase();
+
+            // Psalm -> Psalms
+            if (normalized === 'psalm') {
+                normalized = 'psalms';
+            }
+
+            // Handle numbered books: "1 samuel" -> "1_samuel", "2 kings" -> "2_kings", etc.
+            normalized = normalized.replace(/^(\d+)\s+/, '$1_');
+
+            return normalized;
+        }
+
+        // Generate BibleHub URL for a reference
+        function getBibleHubUrl(ref) {
+            const parsed = parseBibleRef(ref);
+            if (!parsed) return null;
+            const book = bookToBibleHubFormat(parsed.book);
+            return `https://biblehub.com/${book}/${parsed.chapter}-${parsed.verse}.htm`;
+        }
+
         const BOOK_NAMES = [
             "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges", "Ruth",
             "1 Samuel", "2 Samuel", "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah",
@@ -1404,6 +1442,9 @@
             if (selectedArc && selectedArc.sourcePos.chapterIdx === chapter.index) {
                 const sourceText = getVerseText(selectedArc.sourceRef) || 'No text available';
                 const targetText = getVerseText(selectedArc.targetRef) || 'No text available';
+                const sourceUrl = getBibleHubUrl(selectedArc.sourceRef);
+                const targetUrl = getBibleHubUrl(selectedArc.targetRef);
+
                 selectedArcUI = `
                     <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-3 mb-4">
                         <div class="flex items-center gap-2 mb-2">
@@ -1412,14 +1453,20 @@
                         </div>
                         <div class="space-y-2">
                             <div>
-                                <span class="text-green-400 text-sm font-medium">${selectedArc.sourceRef}</span>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-green-400 text-sm font-medium">${selectedArc.sourceRef}</span>
+                                    ${sourceUrl ? `<a href="${sourceUrl}" target="_blank" class="text-[10px] bg-gray-700/50 hover:bg-gray-600 text-gray-300 hover:text-white px-1.5 py-0.5 rounded transition-colors border border-gray-600/50">BibleHub</a>` : ''}
+                                </div>
                                 <p class="text-gray-300 text-xs mt-1 leading-relaxed">${sourceText}</p>
                             </div>
                             <div class="text-center">
                                 <span class="text-gray-500 text-xs">↓ ${selectedArc.votes} votes ↓</span>
                             </div>
                             <div>
-                                <span class="text-blue-400 text-sm font-medium">${selectedArc.targetRef}</span>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-blue-400 text-sm font-medium">${selectedArc.targetRef}</span>
+                                    ${targetUrl ? `<a href="${targetUrl}" target="_blank" class="text-[10px] bg-gray-700/50 hover:bg-gray-600 text-gray-300 hover:text-white px-1.5 py-0.5 rounded transition-colors border border-gray-600/50">BibleHub</a>` : ''}
+                                </div>
                                 <p class="text-gray-300 text-xs mt-1 leading-relaxed">${targetText}</p>
                             </div>
                         </div>
@@ -1524,10 +1571,15 @@
             const refs = (crossRefs[ref] || [])
                 .filter(r => r.votes >= voteThreshold)
                 .sort((a,b) => b.votes - a.votes);
+            const bibleHubUrl = getBibleHubUrl(ref);
+
             panel.innerHTML = `
                 <div class="space-y-3">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-semibold text-blue-400">${ref}</h3>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm font-semibold text-blue-400">${ref}</h3>
+                            ${bibleHubUrl ? `<a href="${bibleHubUrl}" target="_blank" class="text-[10px] bg-gray-700/50 hover:bg-gray-600 text-gray-300 hover:text-white px-1.5 py-0.5 rounded transition-colors border border-gray-600/50">BibleHub</a>` : ''}
+                        </div>
                         <button onclick="selectBook('${ref.split(' ')[0]}')" class="text-xs text-gray-400 hover:text-blue-300">
                             View chapter
                         </button>
@@ -1537,13 +1589,18 @@
                     <div>
                         <h4 class="text-xs font-semibold text-gray-400 uppercase mb-1">Cross-References (${refs.length})</h4>
                         <div class="space-y-1 max-h-60 overflow-y-auto">
-                            ${refs.map(r => `
+                            ${refs.map(r => {
+                                const rBibleHubUrl = getBibleHubUrl(r.to);
+                                return `
                                 <div class="bg-gray-700 rounded p-1.5 text-xs flex justify-between items-center cursor-pointer hover:bg-gray-600"
                                      onclick="showVerseDetail('${r.to}')">
-                                    <span class="text-blue-300">→ ${r.to}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-blue-300">→ ${r.to}</span>
+                                        ${rBibleHubUrl ? `<a href="${rBibleHubUrl}" target="_blank" class="text-[10px] bg-gray-700/50 hover:bg-gray-600 text-gray-300 hover:text-white px-1.5 py-0.5 rounded transition-colors border border-gray-600/50" onclick="event.stopPropagation()">Hub</a>` : ''}
+                                    </div>
                                     <span class="text-gray-500 bg-gray-800 px-1.5 rounded">${r.votes}v</span>
                                 </div>
-                            `).join('')}
+                            `}).join('')}
                         </div>
                     </div>
                     ` : '<p class="text-gray-500 text-xs">No cross-references above vote threshold</p>'}
