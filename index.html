@@ -613,6 +613,53 @@
             }
         }
 
+        // Helper function to extract book name from article title
+        function extractBookFromTitle(title) {
+            let book = 'Unknown';
+            let match;
+
+            // Pattern 1: defendinginerrancy.com - "Book Chapter:Verse—..." at start
+            match = title.match(/^([A-Z\d][\w\s]+?)\s+\d+:\d+(?=—)/);
+            if (match) {
+                book = match[1].trim();
+            } else {
+                // Pattern 2: "in Book Chapter:Verse"
+                match = title.match(/\b(?:in|at|from)\s+"?\s*([A-Z\d][\w\s]+?)\s+\d+:/);
+                if (match) {
+                    book = match[1].trim();
+                } else {
+                    // Pattern 3: "Do Book Chapter" (skip "Do ")
+                    match = title.match(/\bDo\s+([A-Z\d][\w\s]+?)\s+\d+:/);
+                    if (match) {
+                        book = match[1].trim();
+                    } else {
+                        // Pattern 4: "omit Book Chapter" or other action verbs
+                        match = title.match(/(?:omit|include|add|erroneously|repeat)\s+([A-Z\d][\w\s]+?)\s+\d+:/);
+                        if (match) {
+                            book = match[1].trim();
+                        } else {
+                            // Pattern 5: "(Book Chapter:Verse)" - parenthetical
+                            match = title.match(/\(([A-Z\d][\w\s]+?)\s+\d+:/);
+                            if (match) {
+                                book = match[1].trim();
+                            } else {
+                                // Pattern 6: "Something and Book Chapter:Verse"
+                                match = title.match(/and\s+([A-Z\d][\w\s]+?)\s+\d+:/);
+                                if (match) {
+                                    book = match[1].trim();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Normalize Psalm to Psalms
+            if (book === 'Psalm') book = 'Psalms';
+
+            return book;
+        }
+
         function buildBibleDifficultiesList() {
             const container = document.getElementById('bible-diff-list');
 
@@ -634,47 +681,7 @@
                 if (activeBook) {
                     // Search within book-filtered articles
                     searchWithin = searchWithin.filter(article => {
-                        let articleBook = 'Unknown';
-                        let match;
-
-                        // Pattern 1: defendinginerrancy.com - "Book Chapter:Verse—..." at start
-                        match = article.title.match(/^([A-Z\d][\w\s]+?)\s+\d+:\d+(?=—)/);
-                        if (match) {
-                            articleBook = match[1].trim();
-                        } else {
-                            // Pattern 2: "in Book Chapter:Verse"
-                            match = article.title.match(/\b(?:in|at|from)\s+"?\s*([A-Z\d][\w\s]+?)\s+\d+:/);
-                            if (match) {
-                                articleBook = match[1].trim();
-                            } else {
-                                // Pattern 3: "Do Book Chapter" (skip "Do ")
-                                match = article.title.match(/\bDo\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                                if (match) {
-                                    articleBook = match[1].trim();
-                                } else {
-                                    // Pattern 4: "omit Book Chapter" or other action verbs
-                                    match = article.title.match(/(?:omit|include|add|erroneously|repeat)\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                                    if (match) {
-                                        articleBook = match[1].trim();
-                                    } else {
-                                        // Pattern 5: "(Book Chapter:Verse)" - parenthetical
-                                        match = article.title.match(/\(([A-Z\d][\w\s]+?)\s+\d+:/);
-                                        if (match) {
-                                            articleBook = match[1].trim();
-                                        } else {
-                                            // Pattern 6: "Something and Book Chapter:Verse"
-                                            match = article.title.match(/and\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                                            if (match) {
-                                                articleBook = match[1].trim();
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if (articleBook === 'Psalm') articleBook = 'Psalms';
-
+                        const articleBook = extractBookFromTitle(article.title);
                         const normalizedBook = activeBook === 'Psalm' ? 'Psalms' : activeBook;
                         return articleBook.toLowerCase() === normalizedBook.toLowerCase();
                     });
@@ -712,54 +719,7 @@
             const displayArticles = uniqueArticles.slice(0, 100);
 
             container.innerHTML = displayArticles.map(article => {
-                // Extract book name from title - handle multiple formats:
-                // DefendingInerrancy: "Genesis 30:14—Did Saul..." -> Genesis
-                // kjvtoday.net: "Question in Genesis 30:11?" -> Genesis
-                // kjvtoday.net: ""Quote" in 2 Kings 22:14?" -> 2 Kings
-                // kjvtoday.net: "Do 1 Kings 7:15..." -> 1 Kings
-                // kjvtoday.net: "Does the ... omit Book 21:36-37?" -> Book
-                // kjvtoday.net: "Angel at the Pool (John 5:3-4)" -> John
-                let book = 'Unknown';
-                let match;
-
-                // Pattern 1: defendinginerrancy.com - "Book Chapter:Verse—..." at start
-                match = article.title.match(/^([A-Z\d][\w\s]+?)\s+\d+:\d+(?=—)/);
-                if (match) {
-                    book = match[1].trim();
-                } else {
-                    // Pattern 2: "in Book Chapter:Verse"
-                    match = article.title.match(/\b(?:in|at|from)\s+"?\s*([A-Z\d][\w\s]+?)\s+\d+:/);
-                    if (match) {
-                        book = match[1].trim();
-                    } else {
-                        // Pattern 3: "Do Book Chapter" (skip "Do ")
-                        match = article.title.match(/\bDo\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                        if (match) {
-                            book = match[1].trim();
-                        } else {
-                            // Pattern 4: "omit Book Chapter" or other action verbs
-                            match = article.title.match(/(?:omit|include|add|erroneously|repeat)\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                            if (match) {
-                                book = match[1].trim();
-                            } else {
-                                // Pattern 5: "(Book Chapter:Verse)" - parenthetical
-                                match = article.title.match(/\(([A-Z\d][\w\s]+?)\s+\d+:/);
-                                if (match) {
-                                    book = match[1].trim();
-                                } else {
-                                    // Pattern 6: "Something and Book Chapter:Verse"
-                                    match = article.title.match(/and\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                                    if (match) {
-                                        book = match[1].trim();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Fix common variations
-                if (book === 'Psalm') book = 'Psalms';  // Normalize to Psalms
+                const book = extractBookFromTitle(article.title);
 
                 // Get source color
                 const sourceColor = article.source === 'kjvtoday.net' ? 'text-yellow-400' : 'text-green-400';
@@ -796,47 +756,7 @@
             const normalizedBook = book === 'Psalm' ? 'Psalms' : book;
 
             const filtered = window.bibleDifficulties.filter(article => {
-                let articleBook = 'Unknown';
-                let match;
-
-                // Pattern 1: defendinginerrancy.com - "Book Chapter:Verse—..." at start
-                match = article.title.match(/^([A-Z\d][\w\s]+?)\s+\d+:\d+(?=—)/);
-                if (match) {
-                    articleBook = match[1].trim();
-                } else {
-                    // Pattern 2: "in Book Chapter:Verse"
-                    match = article.title.match(/\b(?:in|at|from)\s+"?\s*([A-Z\d][\w\s]+?)\s+\d+:/);
-                    if (match) {
-                        articleBook = match[1].trim();
-                    } else {
-                        // Pattern 3: "Do Book Chapter" (skip "Do ")
-                        match = article.title.match(/\bDo\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                        if (match) {
-                            articleBook = match[1].trim();
-                        } else {
-                            // Pattern 4: "omit Book Chapter" or other action verbs
-                            match = article.title.match(/(?:omit|include|add|erroneously|repeat)\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                            if (match) {
-                                articleBook = match[1].trim();
-                            } else {
-                                // Pattern 5: "(Book Chapter:Verse)" - parenthetical
-                                match = article.title.match(/\(([A-Z\d][\w\s]+?)\s+\d+:/);
-                                if (match) {
-                                    articleBook = match[1].trim();
-                                } else {
-                                    // Pattern 6: "Something and Book Chapter:Verse"
-                                    match = article.title.match(/and\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                                    if (match) {
-                                        articleBook = match[1].trim();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (articleBook === 'Psalm') articleBook = 'Psalms';
-
+                const articleBook = extractBookFromTitle(article.title);
                 return articleBook.toLowerCase() === normalizedBook.toLowerCase();
             });
 
