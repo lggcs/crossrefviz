@@ -47,18 +47,21 @@
             width: 16rem;
             background-color: #1f2937;
             border-right: 1px solid #374151;
-            display: none;
+            display: flex;
             flex-direction: column;
             flex-shrink: 0;
         }
         @media (min-width: 640px) {
             .responsive-sidebar {
                 width: 18rem;
-                display: flex;
             }
         }
         @media (max-width: 640px) {
             .responsive-sidebar {
+                display: none;
+            }
+            .responsive-sidebar.open {
+                display: flex;
                 position: fixed;
                 left: 0;
                 top: 0;
@@ -66,12 +69,8 @@
                 width: 85%;
                 max-width: 320px;
                 z-index: 50;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
+                animation: slideInLeft 0.3s ease;
                 border-right: 0;
-            }
-            .responsive-sidebar.open {
-                transform: translateX(0);
             }
         }
 
@@ -80,17 +79,19 @@
             width: 18rem;
             background-color: #1f2937;
             border-left: 1px solid #374151;
-            display: none;
+            display: flex;
             flex-direction: column;
             flex-shrink: 0;
         }
         @media (min-width: 640px) {
-            .responsive-details {
-                display: flex;
-            }
+            /* Desktop - details panel is always visible */
         }
         @media (max-width: 640px) {
             .responsive-details {
+                display: none;
+            }
+            .responsive-details.open {
+                display: flex;
                 position: fixed;
                 right: 0;
                 bottom: 0;
@@ -98,11 +99,26 @@
                 top: auto;
                 max-height: 85vh;
                 z-index: 50;
-                transform: translateY(100%);
-                transition: transform 0.3s ease;
                 border-left: 0;
+                animation: slideUp 0.3s ease;
             }
-            .responsive-details.open {
+        }
+
+        /* Animations */
+        @keyframes slideInLeft {
+            from {
+                transform: translateX(-100%);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+            to {
                 transform: translateY(0);
             }
         }
