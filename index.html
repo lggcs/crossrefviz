@@ -322,7 +322,7 @@
             </div>
 
             <!-- Mobile footer -->
-            <footer class="h-6 sm:h-6 hidden sm:flex bg-gray-800 border-t border-gray-700 px-3 items-center justify-center text-[10px] text-gray-500 flex-shrink-0">
+            <footer class="h-6 sm:h-6 flex bg-gray-800 border-t border-gray-700 px-3 items-center justify-center text-[10px] text-gray-500 flex-shrink-0">
                 Cross-references from <a href="https://openbible.info/labs/cross-references/" class="text-blue-400 hover:text-blue-300" target="_blank">openbible.info</a> (CC BY 4.0) • KJV text from <a href="https://github.com/farskipper/kjv" class="text-blue-400 hover:text-blue-300" target="_blank">farskipper/kjv</a>
             </footer>
         </main>
@@ -1331,8 +1331,16 @@
             };
 
             // Dynamically position overlays to cover space below arcs
-            // Canvas is offset by -37vh, so we need to position overlays at the visual arc bottom
-            const canvasOffset = 0.3 * window.innerHeight;  // 30vh in pixels
+            // Canvas offset should be based on the header height, not viewport height
+            // for consistency across desktop and mobile
+            const header = document.querySelector('header');
+            const mobileControls = document.querySelector('.mobile-only.bg-gray-800');  // Mobile controls bar
+            let canvasOffset = 0.3 * window.innerHeight;  // Default to 30vh (desktop)
+
+            // On mobile (≤640px), use actual header heights for more precise offset
+            if (window.innerWidth <= 640) {
+                canvasOffset = header.offsetHeight + (mobileControls ? mobileControls.offsetHeight : 0);
+            }
 
             const statusOverlay = document.getElementById('status-bar-overlay');
             const bibleDiffOverlay = document.getElementById('bible-diff-overlay');
