@@ -41,49 +41,210 @@
             background-color: rgba(59, 130, 246, 0.2);
             border-left: 3px solid #3b82f6;
         }
+
+        /* Responsive Sidebar - drawer on mobile, static on desktop */
+        .responsive-sidebar {
+            width: 16rem;
+            background-color: #1f2937;
+            border-right: 1px solid #374151;
+            display: none;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        @media (min-width: 640px) {
+            .responsive-sidebar {
+                width: 18rem;
+                display: flex;
+            }
+        }
+        @media (max-width: 640px) {
+            .responsive-sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                width: 85%;
+                max-width: 320px;
+                z-index: 50;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                border-right: 0;
+            }
+            .responsive-sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        /* Responsive Details Panel - drawer on mobile, static on desktop */
+        .responsive-details {
+            width: 18rem;
+            background-color: #1f2937;
+            border-left: 1px solid #374151;
+            display: none;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        @media (min-width: 640px) {
+            .responsive-details {
+                display: flex;
+            }
+        }
+        @media (max-width: 640px) {
+            .responsive-details {
+                position: fixed;
+                right: 0;
+                bottom: 0;
+                left: 0;
+                top: auto;
+                max-height: 85vh;
+                z-index: 50;
+                transform: translateY(100%);
+                transition: transform 0.3s ease;
+                border-left: 0;
+            }
+            .responsive-details.open {
+                transform: translateY(0);
+            }
+        }
+
+        /* Overlay for mobile drawers */
+        .drawer-overlay {
+            display: none;
+        }
+        @media (max-width: 640px) {
+            .drawer-overlay.show {
+                display: block;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 40;
+            }
+        }
+
+        /* Mobile header */
+        .mobile-only {
+            display: none;
+        }
+        @media (max-width: 640px) {
+            .mobile-only {
+                display: flex !important;
+            }
+            .desktop-only {
+                display: none !important;
+            }
+        }
+
+        .mobile-fab {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .mobile-fab:hover {
+            transform: scale(1.05);
+            background: #2563eb;
+        }
+        .mobile-fab:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 h-screen flex flex-col">
+    <!-- Overlay for mobile drawers -->
+    <div id="drawer-overlay" class="drawer-overlay"></div>
+
+    <!-- Mobile FAB buttons -->
+    <div class="mobile-only fixed bottom-20 right-4 z-30 flex flex-col gap-3">
+        <button id="menu-toggle" class="mobile-fab" title="Open menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+        <button id="details-toggle" class="mobile-fab hidden" title="View details">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+        </button>
+    </div>
+
     <!-- Header -->
-    <header class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between flex-shrink-0">
-        <div class="flex items-center gap-3">
-            <h1 class="text-base sm:text-lg font-bold text-blue-400">Bible Cross-References</h1>
+    <header class="bg-gray-800 border-b border-gray-700 px-3 py-2 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold text-blue-400 truncate">Bible Cross-References</h1>
             <span class="text-xs text-gray-400 hidden sm:inline">
                 <span id="stats">Loading...</span>
             </span>
         </div>
         <div class="flex items-center gap-2 sm:gap-4">
-            <div class="flex items-center gap-1 sm:gap-2">
+            <div class="hidden sm:flex items-center gap-1 sm:gap-2">
                 <label class="text-xs text-gray-400">Votes:</label>
-                <input type="range" id="vote-threshold" min="1" max="50" value="5" 
+                <input type="range" id="vote-threshold" min="1" max="50" value="5"
                        class="w-20 sm:w-24 h-2 bg-gray-700 rounded-lg cursor-pointer">
                 <span id="vote-value" class="text-xs w-6">5</span>
             </div>
-            <div class="flex items-center gap-1 sm:gap-2">
+            <div class="hidden sm:flex items-center gap-1 sm:gap-2">
                 <label class="text-xs text-gray-400">Arcs:</label>
                 <input type="range" id="arc-limit" min="100" max="3000" value="500" step="100"
                        class="w-20 sm:w-24 h-2 bg-gray-700 rounded-lg cursor-pointer">
                 <span id="arc-value" class="text-xs w-8">500</span>
             </div>
-            <input type="text" id="search-input" placeholder="Search..." 
-                   class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 w-24 sm:w-36 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="text" id="search-input" placeholder="Search..."
+                   class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 w-20 sm:w-36 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
     </header>
+
+    <!-- Mobile Controls Bar -->
+    <div class="mobile-only bg-gray-800 border-b border-gray-700 px-3 py-2 flex items-center gap-3 flex-shrink-0">
+        <div class="flex items-center gap-1">
+            <label class="text-xs text-gray-400">Votes:</label>
+            <input type="range" id="vote-threshold-mobile" min="1" max="50" value="5"
+                   class="w-16 h-2 bg-gray-700 rounded-lg cursor-pointer">
+            <span id="vote-value-mobile" class="text-xs w-5">5</span>
+        </div>
+        <div class="flex items-center gap-1">
+            <label class="text-xs text-gray-400">Arcs:</label>
+            <input type="range" id="arc-limit-mobile" min="100" max="3000" value="500" step="100"
+                   class="w-16 h-2 bg-gray-700 rounded-lg cursor-pointer">
+            <span id="arc-value-mobile" class="text-xs w-6">500</span>
+        </div>
+    </div>
 
     <!-- Main -->
     <div class="flex flex-1 overflow-hidden">
         <!-- Sidebar -->
-        <aside class="w-40 sm:w-56 bg-gray-800 border-r border-gray-700 flex flex-col flex-shrink-0">
+        <aside id="sidebar" class="responsive-sidebar">
+            <div class="p-2 border-b border-gray-700 flex items-center justify-between">
+                <h2 class="text-xs font-semibold text-gray-400 uppercase">Menu</h2>
+                <button id="sidebar-close" class="mobile-only text-gray-400 hover:text-white p-1">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
             <div class="p-2 border-b border-gray-700">
                 <h2 class="text-xs font-semibold text-gray-400 uppercase">Themes</h2>
             </div>
-            <div id="theme-filter" class="p-1 space-y-0.5 text-xs">
+            <div id="theme-filter" class="p-1 space-y-0.5 text-xs flex-1 overflow-y-auto">
                 <!-- Populated by JS -->
             </div>
             <div class="p-2 border-b border-gray-700 border-t">
                 <h2 class="text-xs font-semibold text-gray-400 uppercase">Books</h2>
             </div>
-            <div id="book-list" class="flex-1 overflow-y-auto p-1 space-y-0.5 text-xs">
+            <div id="book-list" class="p-1 space-y-0.5 text-xs flex-1 overflow-y-auto">
                 <!-- Populated by JS -->
             </div>
         </aside>
@@ -99,36 +260,43 @@
 
             <!-- Bible Difficulties Section -->
             <div class="border-t border-gray-700 bg-gray-800/50">
-                <div class="px-3 py-2 flex items-center justify-between">
+                <div class="px-2 sm:px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between">
                     <div class="flex items-center gap-2">
                         <h3 class="text-xs font-semibold text-gray-400 uppercase">Bible Difficulties</h3>
                         <span id="bible-diff-filter-label" class="text-xs text-blue-400 hidden">(<span id="bible-diff-book-label">Book</span>)</span>
                     </div>
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2 sm:gap-3">
                         <div class="flex items-center gap-1 text-[10px] text-gray-500">
                             <span class="w-2 h-2 rounded-full bg-green-400"></span>
-                            <span>defending</span>
+                            <span class="hidden sm:inline">defending</span>
                             <span class="w-2 h-2 rounded-full bg-yellow-400 ml-1"></span>
-                            <span>kjvtoday</span>
+                            <span class="hidden sm:inline">kjvtoday</span>
                         </div>
                         <input type="text" id="bible-diff-search" placeholder="Search..."
-                               class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 w-20 sm:w-32 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                               class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 flex-1 sm:w-32 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
-                <div id="bible-diff-list" class="px-3 pb-3 max-h-48 overflow-y-auto text-xs space-y-1">
+                <div id="bible-diff-list" class="px-2 sm:px-3 pb-3 max-h-48 overflow-y-auto text-xs space-y-1">
                     <p class="text-gray-500 text-center py-2">Loading Bible difficulties...</p>
                 </div>
             </div>
 
-            <footer class="h-6 bg-gray-800 border-t border-gray-700 px-3 flex items-center justify-center text-[10px] text-gray-500 flex-shrink-0">
+            <!-- Mobile footer -->
+            <footer class="h-6 sm:h-6 hidden sm:flex bg-gray-800 border-t border-gray-700 px-3 items-center justify-center text-[10px] text-gray-500 flex-shrink-0">
                 Cross-references from <a href="https://openbible.info/labs/cross-references/" class="text-blue-400 hover:text-blue-300" target="_blank">openbible.info</a> (CC BY 4.0) • KJV text from <a href="https://github.com/farskipper/kjv" class="text-blue-400 hover:text-blue-300" target="_blank">farskipper/kjv</a>
             </footer>
         </main>
 
-        <!-- Detail Panel -->
-        <aside class="w-64 sm:w-72 bg-gray-800 border-l border-gray-700 flex flex-col flex-shrink-0 hidden sm:flex">
-            <div class="p-2 border-b border-gray-700">
+        <!-- Detail Panel - Responsive (static on desktop, drawer on mobile) -->
+        <aside id="details-panel" class="responsive-details">
+            <div class="p-2 border-b border-gray-700 flex items-center justify-between">
                 <h2 class="text-xs font-semibold text-gray-400 uppercase">Details</h2>
+                <button id="details-close" class="mobile-only text-gray-400 hover:text-white p-1">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
             </div>
             <div id="detail-content" class="flex-1 overflow-y-auto p-2 text-xs">
                 <p class="text-gray-500">Click on a chapter to see details</p>
@@ -616,9 +784,10 @@
 
         function buildThemeFilter() {
             const container = document.getElementById('theme-filter');
+
             container.innerHTML = `
                 <button onclick="setThemeFilter(null)"
-                        class="w-full text-left px-2 py-1 rounded ${!activeTheme ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}">
+                        class="w-full text-left px-2 py-1.5 rounded ${!activeTheme ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}">
                     All Themes
                 </button>
             `;
@@ -628,7 +797,7 @@
                 const isActive = activeTheme === themeKey;
                 container.innerHTML += `
                     <button onclick="setThemeFilter('${themeKey}')"
-                            class="w-full text-left px-2 py-1 rounded flex items-center gap-2 ${isActive ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}">
+                            class="w-full text-left px-2 py-1.5 rounded flex items-center gap-2 ${isActive ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}">
                         <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${theme.color}"></span>
                         <span>${theme.name}</span>
                     </button>
@@ -683,7 +852,7 @@
         function buildBookList() {
             const list = document.getElementById('book-list');
             list.innerHTML = '';
-            
+
             const bookStarts = {};
             chapters.forEach(ch => {
                 if (!bookStarts[ch.book]) {
@@ -692,17 +861,24 @@
                 bookStarts[ch.book].end = ch.index;
                 bookStarts[ch.book].count++;
             });
-            
+
             for (const book of BOOK_NAMES) {
                 if (!bookStarts[book]) continue;
                 const div = document.createElement('div');
-                div.className = 'sidebar-book p-2 rounded cursor-pointer';
+                div.className = 'sidebar-book p-2.5 rounded cursor-pointer';
                 div.dataset.book = book;
                 div.innerHTML = `
                     <div class="font-medium truncate">${book}</div>
                     <div class="text-xs text-gray-400">${bookStarts[book].count} ch</div>
                 `;
-                div.onclick = () => selectBook(book);
+                div.addEventListener('click', () => {
+                    selectBook(book);
+                    // Close sidebar on mobile
+                    if (window.innerWidth <= 640) {
+                        document.getElementById('sidebar').classList.remove('open');
+                        document.getElementById('drawer-overlay').classList.remove('show');
+                    }
+                });
                 list.appendChild(div);
             }
         }
@@ -880,6 +1056,7 @@
                 currentChapterView = null;
                 document.getElementById('detail-content').innerHTML =
                     '<p class="text-gray-500">Click on a chapter to see details</p>';
+                document.getElementById('details-toggle').classList.add('hidden');
 
                 // Show all Bible difficulties when no book is selected
                 window.renderBibleDifficulties(window.bibleDifficulties || []);
@@ -904,6 +1081,32 @@
         }
 
         function setupEvents() {
+            // Mobile slider sync
+            const mobileVoteSlider = document.getElementById('vote-threshold-mobile');
+            const mobileArcSlider = document.getElementById('arc-limit-mobile');
+            const desktopVoteSlider = document.getElementById('vote-threshold');
+            const desktopArcSlider = document.getElementById('arc-limit');
+
+            if (mobileVoteSlider) {
+                mobileVoteSlider.oninput = (e) => {
+                    voteThreshold = parseInt(e.target.value);
+                    document.getElementById('vote-value-mobile').textContent = voteThreshold;
+                    if (desktopVoteSlider) desktopVoteSlider.value = voteThreshold;
+                    document.getElementById('vote-value').textContent = voteThreshold;
+                    if (currentChapterView) showDetails(currentChapterView);
+                    render();
+                };
+            }
+            if (mobileArcSlider) {
+                mobileArcSlider.oninput = (e) => {
+                    arcLimit = parseInt(e.target.value);
+                    document.getElementById('arc-value-mobile').textContent = arcLimit;
+                    if (desktopArcSlider) desktopArcSlider.value = arcLimit;
+                    document.getElementById('arc-value').textContent = arcLimit;
+                    render();
+                };
+            }
+
             document.getElementById('vote-threshold').oninput = (e) => {
                 voteThreshold = parseInt(e.target.value);
                 document.getElementById('vote-value').textContent = voteThreshold;
@@ -937,6 +1140,41 @@
                 updateHover();
             });
             canvas.addEventListener('click', handleClick);
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (e.touches.length > 0) {
+                    const touch = e.touches[0];
+                    const rect = canvas.getBoundingClientRect();
+                    mouseX = touch.clientX - rect.left;
+                    mouseY = touch.clientY - rect.top;
+                    updateHover();
+                }
+            }, { passive: false });
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                const layout = window.layout;
+                if (!layout) return;
+
+                // Check if we tapped on an arc
+                const clickedArc = findArcAtPosition(mouseX, mouseY);
+                if (clickedArc) {
+                    selectedArc = clickedArc;
+                    currentChapterView = chapters[clickedArc.sourcePos.chapterIdx];
+                    showDetails(currentChapterView);
+                    render();
+                    return;
+                }
+
+                // Otherwise check if we tapped on a chapter
+                const idx = Math.floor((mouseX - layout.margin.left) / layout.chapterWidth);
+                if (idx >= 0 && idx < layout.visible.length) {
+                    selectedArc = null;
+                    currentChapterView = layout.visible[idx];
+                    showDetails(currentChapterView);
+                    render();
+                }
+            }, { passive: false });
         }
 
         function getVisibleChapters() {
@@ -1431,6 +1669,17 @@
         function showDetails(chapter) {
             const panel = document.getElementById('detail-content');
 
+            // Show details FAB on mobile
+            const detailsToggle = document.getElementById('details-toggle');
+            if (detailsToggle) {
+                detailsToggle.classList.remove('hidden');
+                // Open details panel on mobile
+                if (window.innerWidth <= 640) {
+                    document.getElementById('details-panel').classList.add('open');
+                    document.getElementById('drawer-overlay').classList.add('show');
+                }
+            }
+
             // Get all verses in this chapter with their cross-references
             const chapterVerses = [];
             let v = 1;
@@ -1530,7 +1779,7 @@
                 `;
             }
 
-            panel.innerHTML = `
+            const html = `
                 <div class="space-y-3">
                     <div>
                         <h3 class="text-sm font-semibold text-blue-400">${chapter.book} ${chapter.chapter}</h3>
@@ -1607,6 +1856,8 @@
                     ` : ''}
                 </div>
             `;
+
+            panel.innerHTML = html;
         }
 
         window.toggleVerse = function(element) {
@@ -1623,6 +1874,18 @@
 
         window.showVerseDetail = function(ref) {
             const panel = document.getElementById('detail-content');
+
+            // Show details FAB on mobile
+            const detailsToggle = document.getElementById('details-toggle');
+            if (detailsToggle) {
+                detailsToggle.classList.remove('hidden');
+                // Open details panel on mobile
+                if (window.innerWidth <= 640) {
+                    document.getElementById('details-panel').classList.add('open');
+                    document.getElementById('drawer-overlay').classList.add('show');
+                }
+            }
+
             const text = verseTexts[ref] || 'Not found';
             const refs = (crossRefs[ref] || [])
                 .filter(r => r.votes >= voteThreshold)
@@ -1743,7 +2006,57 @@
             }
         }
 
-            window.onload = init;
+        // Mobile drawer functions
+        function setupMobileDrawers() {
+            const menuToggle = document.getElementById('menu-toggle');
+            const sidebarClose = document.getElementById('sidebar-close');
+            const detailsToggle = document.getElementById('details-toggle');
+            const detailsClose = document.getElementById('details-close');
+            const overlay = document.getElementById('drawer-overlay');
+            const sidebar = document.getElementById('sidebar');
+            const detailsPanel = document.getElementById('details-panel');
+
+            if (menuToggle) {
+                menuToggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('open');
+                    overlay.classList.toggle('show');
+                });
+            }
+
+            if (sidebarClose) {
+                sidebarClose.addEventListener('click', () => {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('show');
+                });
+            }
+
+            if (detailsToggle) {
+                detailsToggle.addEventListener('click', () => {
+                    detailsPanel.classList.toggle('open');
+                    overlay.classList.toggle('show');
+                });
+            }
+
+            if (detailsClose) {
+                detailsClose.addEventListener('click', () => {
+                    detailsPanel.classList.remove('open');
+                    overlay.classList.remove('show');
+                });
+            }
+
+            if (overlay) {
+                overlay.addEventListener('click', () => {
+                    sidebar.classList.remove('open');
+                    detailsPanel.classList.remove('open');
+                    overlay.classList.remove('show');
+                });
+            }
+        }
+
+        window.onload = async function() {
+            await init();
+            setupMobileDrawers();
+        };
 
             // Animation loop for hover effects
             function animate() {
