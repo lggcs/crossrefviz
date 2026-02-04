@@ -266,8 +266,8 @@
         </aside>
 
         <!-- Visualization -->
-        <main class="flex-1 flex flex-col overflow-hidden bg-gray-900">
-            <div id="viz-container" class="flex-1 relative">
+        <main class="flex-1 flex flex-col bg-gray-900">
+            <div id="viz-container" class="relative" style="flex: 1; overflow: visible;">
                 <canvas id="main-canvas"></canvas>
                 <div id="status-bar-overlay" class="absolute left-0 right-0 bg-gray-800 border-t border-gray-700 px-3 h-8 flex items-center text-xs text-gray-400 z-10 hidden" style="height: 32px;">
                     Hover over the visualization to explore
@@ -1331,16 +1331,8 @@
             };
 
             // Dynamically position overlays to cover space below arcs
-            // Canvas offset should be based on the header height, not viewport height
-            // for consistency across desktop and mobile
-            const header = document.querySelector('header');
-            const mobileControls = document.querySelector('.mobile-only.bg-gray-800');  // Mobile controls bar
-            let canvasOffset = 0.3 * window.innerHeight;  // Default to 30vh (desktop)
-
-            // On mobile (≤640px), use actual header heights for more precise offset
-            if (window.innerWidth <= 640) {
-                canvasOffset = header.offsetHeight + (mobileControls ? mobileControls.offsetHeight : 0);
-            }
+            // Canvas offset - use consistent value across devices
+            const canvasOffset = 0.3 * window.innerHeight;  // 30vh in pixels
 
             const statusOverlay = document.getElementById('status-bar-overlay');
             const bibleDiffOverlay = document.getElementById('bible-diff-overlay');
