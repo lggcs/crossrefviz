@@ -1168,12 +1168,19 @@
             }, { passive: false });
             canvas.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                const rect = canvas.getBoundingClientRect();
+                // Get the touch position from the last known touch or use changedTouches
+                let touchX = mouseX, touchY = mouseY;
+                if (e.changedTouches && e.changedTouches.length > 0) {
+                    const rect = canvas.getBoundingClientRect();
+                    touchX = e.changedTouches[0].clientX - rect.left;
+                    touchY = e.changedTouches[0].clientY - rect.top;
+                }
+
                 const layout = window.layout;
                 if (!layout) return;
 
                 // Check if we tapped on an arc
-                const clickedArc = findArcAtPosition(mouseX, mouseY);
+                const clickedArc = findArcAtPosition(touchX, touchY);
                 if (clickedArc) {
                     selectedArc = clickedArc;
                     currentChapterView = chapters[clickedArc.sourcePos.chapterIdx];
@@ -1183,7 +1190,7 @@
                 }
 
                 // Otherwise check if we tapped on a chapter
-                const idx = Math.floor((mouseX - layout.margin.left) / layout.chapterWidth);
+                const idx = Math.floor((touchX - layout.margin.left) / layout.chapterWidth);
                 if (idx >= 0 && idx < layout.visible.length) {
                     selectedArc = null;
                     currentChapterView = layout.visible[idx];
@@ -1641,7 +1648,9 @@
             const layout = window.layout;
             if (!layout || !layout.allArcs) return null;
 
-            const maxDistance = 15; // pixels - tighter tolerance for clicking
+            // Use larger tolerance for touch/mobile devices
+            const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            const maxDistance = isTouch ? 35 : 15; // pixels - tighter tolerance for clicking, looser for touch
 
             for (const arc of layout.allArcs) {
                 const dx = Math.abs(arc.x2 - arc.x1);
