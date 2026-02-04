@@ -138,9 +138,13 @@
 
     <!-- Loading -->
     <div id="loading" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
-        <div class="text-center">
+        <div class="text-center w-64">
             <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p class="text-gray-400 text-sm">Loading data...</p>
+            <p id="loading-text" class="text-gray-400 text-sm">Loading data...</p>
+            <div id="loading-progress" class="w-full bg-gray-700 rounded-full h-2 mt-3 hidden">
+                <div id="loading-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="loading-detail" class="text-gray-500 text-xs mt-2"></p>
         </div>
     </div>
 
@@ -296,25 +300,52 @@
             );
         }
 
+        // Update loading UI
+        function updateLoading(text, progress, detail) {
+            document.getElementById('loading-text').textContent = text;
+            if (progress !== null) {
+                const progressBar = document.getElementById('loading-progress');
+                const loadingBar = document.getElementById('loading-bar');
+                progressBar.classList.remove('hidden');
+                loadingBar.style.width = progress + '%';
+            }
+            if (detail) {
+                document.getElementById('loading-detail').textContent = detail;
+            }
+        }
+
         async function init() {
             canvas = document.getElementById('main-canvas');
             ctx = canvas.getContext('2d', { alpha: false });
-            
+
             try {
+                // Track loading progress
+                const totalSteps = 5;
+                let currentStep = 0;
+
                 // Load data
                 console.log('Loading verses...');
+                updateLoading('Loading Bible verses...', (currentStep / totalSteps) * 100, 'Fetching verses-1769.json (~4.6MB)');
                 const rv = await fetch('verses-1769.json');
                 verseTexts = await rv.json();
+                currentStep++;
+                updateLoading('Loading Bible verses...', (currentStep / totalSteps) * 100, `${Object.keys(verseTexts).length.toLocaleString()} verses loaded`);
 
                 console.log('Loading refs...');
+                updateLoading('Loading cross-references...', (currentStep / totalSteps) * 100, 'Fetching openbible.json (~40MB) - this may take a moment');
                 const rr = await fetch('openbible.json');
                 const refsData = await rr.json();
                 crossRefs = refsData.cross_references;
+                currentStep++;
+                updateLoading('Loading cross-references...', (currentStep / totalSteps) * 100, `${Object.values(crossRefs).reduce((a, b) => a + b.length, 0).toLocaleString()} references loaded`);
 
                 console.log('Loading Rainbow Bible themes...');
+                updateLoading('Loading themes...', ((currentStep) / totalSteps) * 100, 'Fetching verse_themes.json (~4.1MB)');
                 const tr = await fetch('verse_themes.json');
                 const themeData = await tr.json();
                 verseThemes = themeData.verse_themes;
+                currentStep++;
+                updateLoading('Loading themes...', ((currentStep) / totalSteps) * 100, `${Object.keys(verseThemes).length.toLocaleString()} verse themes loaded`);
 
                 // Load theme colors from JSON if available
                 if (themeData.rainbow_themes) {
@@ -328,6 +359,7 @@
 
                 // Load Bible difficulties from defendinginerrancy.com
                 console.log('Loading Bible difficulties...');
+                updateLoading('Loading Bible difficulties...', ((currentStep) / totalSteps) * 100, 'Fetching bible_difficulties.json (~221KB)');
                 try {
                     const bd = await fetch('bible_difficulties.json');
                     const rawData = await bd.json();
@@ -349,13 +381,18 @@
                 }
 
                 console.log('Building structure...');
+                updateLoading('Building data structure...', ((currentStep + 1) / totalSteps) * 100, 'Processing cross-references (this may take a moment)');
+                await new Promise(resolve => setTimeout(resolve, 10));  // Allow UI to update
                 buildStructure();
-                
+
                 // Update stats
                 const totalVerses = Object.keys(verseTexts).length;
                 const totalRefs = Object.values(crossRefs).reduce((a, b) => a + b.length, 0);
-                document.getElementById('stats').textContent = 
+                document.getElementById('stats').textContent =
                     `${totalVerses.toLocaleString()} verses, ${totalRefs.toLocaleString()} refs`;
+
+                console.log('Building UI...');
+                updateLoading('Building UI...', ((currentStep + 1) / totalSteps) * 100, 'Rendering interface');
                 
                 // Build UI
                 buildThemeFilter();
@@ -414,6 +451,21 @@
         }
 
         function buildStructure() {
+            console.time('buildStructure');
+
+            // Filter cross-refs by minimum vote threshold for performance
+            // This drastically reduces processing while keeping most important refs
+            const MIN_VOTE_FOR_PROCESSING = 2;  // Only process refs with >= 2 votes
+            const filteredCrossRefs = {};
+
+            for (const [source, refs] of Object.entries(crossRefs)) {
+                const highVoteRefs = refs.filter(r => r.votes >= MIN_VOTE_FOR_PROCESSING);
+                if (highVoteRefs.length > 0) {
+                    filteredCrossRefs[source] = highVoteRefs;
+                }
+            }
+            console.log(`Filtered ${Object.values(crossRefs).reduce((a,b) => a+b.length, 0)} refs to ${Object.values(filteredCrossRefs).reduce((a,b) => a+b.length, 0)} (votes >= ${MIN_VOTE_FOR_PROCESSING})`);
+
             let verseIdx = 0;
             let chapterIdx = 0;
 
@@ -461,10 +513,10 @@
                 }
             }
 
-            // Build verse-level arcs
+            // Build verse-level arcs (use filtered refs for performance)
             let verseArcs = [];
 
-            for (const [source, refs] of Object.entries(crossRefs)) {
+            for (const [source, refs] of Object.entries(filteredCrossRefs)) {
                 // Normalize source reference
                 const sourcePos = versePositions[source];
                 if (!sourcePos) continue;
@@ -508,8 +560,10 @@
             filteredArcs.sort((a, b) => b.votes - a.votes);
             window.verseArcs = filteredArcs;
 
-            // Aggregate cross-refs by chapter (for legacy support)
-            for (const [source, refs] of Object.entries(crossRefs)) {
+            console.log(`Built ${filteredArcs.length} verse-level arcs from filtered refs`);
+
+            // Aggregate cross-refs by chapter (use filtered refs for consistency)
+            for (const [source, refs] of Object.entries(filteredCrossRefs)) {
                 const pos = versePositions[source];
                 if (!pos) continue;
 
@@ -556,6 +610,8 @@
                     });
                 }
             }
+
+            console.timeEnd('buildStructure');
         }
 
         function buildThemeFilter() {
