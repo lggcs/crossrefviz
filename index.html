@@ -284,6 +284,12 @@
                                 <span class="hidden sm:inline">defending</span>
                                 <span class="w-2 h-2 rounded-full bg-yellow-400 ml-1"></span>
                                 <span class="hidden sm:inline">kjvtoday</span>
+                                <span class="w-2 h-2 rounded-full bg-blue-400 ml-1"></span>
+                                <span class="hidden sm:inline">aig</span>
+                                <span class="w-2 h-2 rounded-full bg-purple-400 ml-1"></span>
+                                <span class="hidden sm:inline">christcreated</span>
+                                <span class="w-2 h-2 rounded-full bg-orange-400 ml-1"></span>
+                                <span class="hidden sm:inline">lighthouse</span>
                             </div>
                             <input type="text" id="bible-diff-search-overlay" placeholder="Search..."
                                    class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 flex-1 sm:w-32 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -311,6 +317,12 @@
                             <span class="hidden sm:inline">defending</span>
                             <span class="w-2 h-2 rounded-full bg-yellow-400 ml-1"></span>
                             <span class="hidden sm:inline">kjvtoday</span>
+                            <span class="w-2 h-2 rounded-full bg-blue-400 ml-1"></span>
+                            <span class="hidden sm:inline">aig</span>
+                            <span class="w-2 h-2 rounded-full bg-purple-400 ml-1"></span>
+                            <span class="hidden sm:inline">christcreated</span>
+                            <span class="w-2 h-2 rounded-full bg-orange-400 ml-1"></span>
+                            <span class="hidden sm:inline">lighthouse</span>
                         </div>
                         <input type="text" id="bible-diff-search-container" placeholder="Search..."
                                class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 flex-1 sm:w-32 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -565,28 +577,24 @@
                     console.log('Loaded theme colors from JSON:', RAINBOW_THEMES);
                 }
 
-                // Load Bible difficulties from defendinginerrancy.com
+                // Load Bible difficulties from merged file
                 console.log('Loading Bible difficulties...');
-                updateLoading('Loading Bible difficulties...', ((currentStep) / totalSteps) * 100, 'Fetching bible_difficulties.json (~221KB)');
+                updateLoading('Loading Bible difficulties...', ((currentStep) / totalSteps) * 100, 'Fetching bible_difficulties.json');
+
                 try {
                     const bd = await fetch('bible_difficulties.json');
                     const rawData = await bd.json();
 
-                    // Remove duplicates based on URL
-                    const seenUrls = new Set();
-                    window.bibleDifficulties = rawData.filter(article => {
-                        if (seenUrls.has(article.url)) {
-                            return false;
-                        }
-                        seenUrls.add(article.url);
-                        return true;
-                    });
+                    // Use bible_verse field for simpler mapping
+                    window.bibleDifficulties = rawData;
 
-                    console.log(`Loaded ${window.bibleDifficulties.length} unique Bible difficulties (was ${rawData.length})`);
+                    console.log(`Loaded ${window.bibleDifficulties.length} articles from bible_difficulties.json`);
                 } catch (e) {
                     console.warn('Could not load bible_difficulties.json:', e);
                     window.bibleDifficulties = [];
                 }
+
+                console.log(`Loaded ${window.bibleDifficulties.length} Bible difficulties`);
 
                 console.log('Building structure...');
                 updateLoading('Building data structure...', ((currentStep + 1) / totalSteps) * 100, 'Processing cross-references (this may take a moment)');
@@ -923,45 +931,23 @@
             }
         }
 
-        // Helper function to extract book name from article title
-        function extractBookFromTitle(title) {
+        // Helper function to extract book name from Bible difficulty article
+        // Uses pre-computed bible_verse field if available, falls back to title parsing
+        function extractBookFromArticle(article) {
+            // Use pre-computed bible_verse if available (simpler, more accurate)
+            if (article.bible_verse) {
+                return article.bible_verse.split(' ')[0];  // Just the book name part
+            }
+
+            // Fallback to title parsing if bible_verse not available
+            const title = article.title || '';
             let book = 'Unknown';
             let match;
 
-            // Pattern 1: defendinginerrancy.com - "Book Chapter:Verse—..." at start
-            match = title.match(/^([A-Z\d][\w\s]+?)\s+\d+:\d+(?=—)/);
+            // Try to find any book name at start of title
+            match = title.match(/^([A-Z\d][A-Za-z\s]+?)\s+\d+:/);
             if (match) {
                 book = match[1].trim();
-            } else {
-                // Pattern 2: "in Book Chapter:Verse"
-                match = title.match(/\b(?:in|at|from)\s+"?\s*([A-Z\d][\w\s]+?)\s+\d+:/);
-                if (match) {
-                    book = match[1].trim();
-                } else {
-                    // Pattern 3: "Do Book Chapter" (skip "Do ")
-                    match = title.match(/\bDo\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                    if (match) {
-                        book = match[1].trim();
-                    } else {
-                        // Pattern 4: "omit Book Chapter" or other action verbs
-                        match = title.match(/(?:omit|include|add|erroneously|repeat)\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                        if (match) {
-                            book = match[1].trim();
-                        } else {
-                            // Pattern 5: "(Book Chapter:Verse)" - parenthetical
-                            match = title.match(/\(([A-Z\d][\w\s]+?)\s+\d+:/);
-                            if (match) {
-                                book = match[1].trim();
-                            } else {
-                                // Pattern 6: "Something and Book Chapter:Verse"
-                                match = title.match(/and\s+([A-Z\d][\w\s]+?)\s+\d+:/);
-                                if (match) {
-                                    book = match[1].trim();
-                                }
-                            }
-                        }
-                    }
-                }
             }
 
             // Normalize Psalm to Psalms
@@ -998,7 +984,7 @@
                 if (activeBook) {
                     // Search within book-filtered articles
                     searchWithin = searchWithin.filter(article => {
-                        const articleBook = extractBookFromTitle(article.title);
+                        const articleBook = extractBookFromArticle(article);
                         const normalizedBook = activeBook === 'Psalm' ? 'Psalms' : activeBook;
                         return articleBook.toLowerCase() === normalizedBook.toLowerCase();
                     });
@@ -1046,11 +1032,23 @@
             const displayArticles = uniqueArticles.slice(0, 100);
 
             const html = displayArticles.map(article => {
-                const book = extractBookFromTitle(article.title);
+                const book = extractBookFromArticle(article);
 
-                // Get source color
-                const sourceColor = article.source === 'kjvtoday.net' ? 'text-yellow-400' : 'text-green-400';
-                const sourceLabel = article.source.replace('.com', '').replace('.net', '');
+                // Get source color based on source
+                let sourceColor = 'text-gray-400';
+                if (article.source === 'kjvtoday.net') {
+                    sourceColor = 'text-yellow-400';
+                } else if (article.source === 'answersingenesis.org') {
+                    sourceColor = 'text-blue-400';
+                } else if (article.source === 'christcreated.com') {
+                    sourceColor = 'text-purple-400';
+                } else if (article.source === 'lighthousetrailsresearch.com') {
+                    sourceColor = 'text-orange-400';
+                } else {
+                    // defendinginerrancy.com
+                    sourceColor = 'text-green-400';
+                }
+                const sourceLabel = article.source.replace('.com', '').replace('.net', '').replace('.org', '');
 
                 return `
                     <a href="${article.url}" target="_blank"
@@ -1090,7 +1088,7 @@
             const normalizedBook = book === 'Psalm' ? 'Psalms' : book;
 
             const filtered = window.bibleDifficulties.filter(article => {
-                const articleBook = extractBookFromTitle(article.title);
+                const articleBook = extractBookFromArticle(article);
                 return articleBook.toLowerCase() === normalizedBook.toLowerCase();
             });
 
