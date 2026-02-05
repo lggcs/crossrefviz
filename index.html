@@ -279,17 +279,32 @@
                             <span id="bible-diff-filter-label" class="text-xs text-blue-400 hidden">(<span id="bible-diff-book-label">Book</span>)</span>
                         </div>
                         <div class="flex items-center gap-2 sm:gap-3">
-                            <div class="flex items-center gap-1 text-[10px] text-gray-500">
-                                <span class="w-2 h-2 rounded-full bg-green-400"></span>
-                                <span class="hidden sm:inline">defending</span>
-                                <span class="w-2 h-2 rounded-full bg-yellow-400 ml-1"></span>
-                                <span class="hidden sm:inline">kjvtoday</span>
-                                <span class="w-2 h-2 rounded-full bg-blue-400 ml-1"></span>
-                                <span class="hidden sm:inline">aig</span>
-                                <span class="w-2 h-2 rounded-full bg-purple-400 ml-1"></span>
-                                <span class="hidden sm:inline">christcreated</span>
-                                <span class="w-2 h-2 rounded-full bg-orange-400 ml-1"></span>
-                                <span class="hidden sm:inline">lighthouse</span>
+                            <div class="flex items-center gap-2 text-[10px] text-gray-500">
+                                <div class="flex items-center gap-1 cursor-pointer opacity-100 transition-opacity hover:opacity-80"
+                                     data-source-filter="defendinginerrancy.com" onclick="toggleSourceFilter('defendinginerrancy.com', this)">
+                                    <span id="filter-dot-defending" class="w-2 h-2 rounded-full bg-green-400"></span>
+                                    <span class="hidden sm:inline">defending</span>
+                                </div>
+                                <div class="flex items-center gap-1 cursor-pointer opacity-100 transition-opacity hover:opacity-80"
+                                     data-source-filter="kjvtoday.net" onclick="toggleSourceFilter('kjvtoday.net', this)">
+                                    <span id="filter-dot-kjvtoday" class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                                    <span class="hidden sm:inline">kjvtoday</span>
+                                </div>
+                                <div class="flex items-center gap-1 cursor-pointer opacity-100 transition-opacity hover:opacity-80"
+                                     data-source-filter="answersingenesis.org" onclick="toggleSourceFilter('answersingenesis.org', this)">
+                                    <span id="filter-dot-aig" class="w-2 h-2 rounded-full bg-blue-400"></span>
+                                    <span class="hidden sm:inline">aig</span>
+                                </div>
+                                <div class="flex items-center gap-1 cursor-pointer opacity-100 transition-opacity hover:opacity-80"
+                                     data-source-filter="christcreated.com" onclick="toggleSourceFilter('christcreated.com', this)">
+                                    <span id="filter-dot-christcreated" class="w-2 h-2 rounded-full bg-purple-400"></span>
+                                    <span class="hidden sm:inline">christcreated</span>
+                                </div>
+                                <div class="flex items-center gap-1 cursor-pointer opacity-100 transition-opacity hover:opacity-80"
+                                     data-source-filter="lighthousetrailsresearch.com" onclick="toggleSourceFilter('lighthousetrailsresearch.com', this)">
+                                    <span id="filter-dot-lighthouse" class="w-2 h-2 rounded-full bg-orange-400"></span>
+                                    <span class="hidden sm:inline">lighthouse</span>
+                                </div>
                             </div>
                             <input type="text" id="bible-diff-search-overlay" placeholder="Search..."
                                    class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 flex-1 sm:w-32 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -312,17 +327,32 @@
                         <span id="bible-diff-filter-label-container" class="text-xs text-blue-400 hidden">(<span id="bible-diff-book-label-container">Book</span>)</span>
                     </div>
                     <div class="flex items-center gap-2 sm:gap-3">
-                        <div class="flex items-center gap-1 text-[10px] text-gray-500">
-                            <span class="w-2 h-2 rounded-full bg-green-400"></span>
-                            <span class="hidden sm:inline">defending</span>
-                            <span class="w-2 h-2 rounded-full bg-yellow-400 ml-1"></span>
-                            <span class="hidden sm:inline">kjvtoday</span>
-                            <span class="w-2 h-2 rounded-full bg-blue-400 ml-1"></span>
-                            <span class="hidden sm:inline">aig</span>
-                            <span class="w-2 h-2 rounded-full bg-purple-400 ml-1"></span>
-                            <span class="hidden sm:inline">christcreated</span>
-                            <span class="w-2 h-2 rounded-full bg-orange-400 ml-1"></span>
-                            <span class="hidden sm:inline">lighthouse</span>
+                        <div class="flex items-center gap-2 text-[10px] text-gray-500">
+                            <div class="flex items-center gap-1 cursor-pointer opacity-100 transition-opacity hover:opacity-80"
+                                 data-source-filter="defendinginerrancy.com" onclick="toggleSourceFilter('defendinginerrancy.com', this)">
+                                <span id="filter-dot-defending-container" class="w-2 h-2 rounded-full bg-green-400"></span>
+                                <span class="hidden sm:inline">defending</span>
+                            </div>
+                            <div class="flex items-center gap-1 cursor-pointer opacity-100 transition-opacity hover:opacity-80"
+                                 data-source-filter="kjvtoday.net" onclick="toggleSourceFilter('kjvtoday.net', this)">
+                                <span id="filter-dot-kjvtoday-container" class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                                <span class="hidden sm:inline">kjvtoday</span>
+                            </div>
+                            <div class="flex items-center gap-1 cursor-pointer opacity-100 transition-opacity hover:opacity-80"
+                                 data-source-filter="answersingenesis.org" onclick="toggleSourceFilter('answersingenesis.org', this)">
+                                <span id="filter-dot-aig-container" class="w-2 h-2 rounded-full bg-blue-400"></span>
+                                <span class="hidden sm:inline">aig</span>
+                            </div>
+                            <div class="flex items-center gap-1 cursor-pointer opacity-100 transition-opacity hover:opacity-80"
+                                 data-source-filter="christcreated.com" onclick="toggleSourceFilter('christcreated.com', this)">
+                                <span id="filter-dot-christcreated-container" class="w-2 h-2 rounded-full bg-purple-400"></span>
+                                <span class="hidden sm:inline">christcreated</span>
+                            </div>
+                            <div class="flex items-center gap-1 cursor-pointer opacity-100 transition-opacity hover:opacity-80"
+                                 data-source-filter="lighthousetrailsresearch.com" onclick="toggleSourceFilter('lighthousetrailsresearch.com', this)">
+                                <span id="filter-dot-lighthouse-container" class="w-2 h-2 rounded-full bg-orange-400"></span>
+                                <span class="hidden sm:inline">lighthouse</span>
+                            </div>
                         </div>
                         <input type="text" id="bible-diff-search-container" placeholder="Search..."
                                class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 flex-1 sm:w-32 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -931,6 +961,77 @@
             }
         }
 
+        // Source filter state
+        let activeSourceFilters = new Set(); // Empty means all sources are shown
+
+        // Map source names to short IDs for dot elements
+        const sourceToShortId = {
+            'defendinginerrancy.com': 'defending',
+            'kjvtoday.net': 'kjvtoday',
+            'answersingenesis.org': 'aig',
+            'christcreated.com': 'christcreated',
+            'lighthousetrailsresearch.com': 'lighthouse'
+        };
+
+        // Toggle source filter on/off
+        function toggleSourceFilter(source, element) {
+            if (activeSourceFilters.has(source)) {
+                activeSourceFilters.delete(source);
+                element.classList.remove('opacity-40');
+                element.classList.add('opacity-100');
+            } else {
+                activeSourceFilters.add(source);
+                element.classList.remove('opacity-100');
+                element.classList.add('opacity-40');
+            }
+
+            // Update dot opacity in both overlay and container using the short ID mapping
+            const shortId = sourceToShortId[source];
+            if (shortId) {
+                const dotIds = [`filter-dot-${shortId}`, `filter-dot-${shortId}-container`];
+                dotIds.forEach(id => {
+                    const dot = document.getElementById(id);
+                    if (dot) {
+                        if (activeSourceFilters.has(source)) {
+                            dot.classList.add('opacity-30');
+                        } else {
+                            dot.classList.remove('opacity-30');
+                        }
+                    }
+                });
+            }
+
+            // Re-render filter Bible difficulties list
+            applySourceFilter();
+        }
+
+        // Apply source filter to the displayed articles
+        function applySourceFilter() {
+            if (!window.bibleDifficulties || window.bibleDifficulties.length === 0) return;
+
+            let filtered = window.bibleDifficulties;
+
+            // Filter by active source (exclude sources in the filter set)
+            if (activeSourceFilters.size > 0) {
+                filtered = filtered.filter(article => {
+                    const source = article.source;
+                    if (!source) return true; // Keep if no source
+                    return !activeSourceFilters.has(source);
+                });
+            }
+
+            // Filter by book if active
+            if (activeBook) {
+                const normalizedBook = activeBook === 'Psalm' ? 'Psalms' : activeBook;
+                filtered = filtered.filter(article => {
+                    const articleBook = extractBookFromArticle(article);
+                    return articleBook.toLowerCase() === normalizedBook.toLowerCase();
+                });
+            }
+
+            window.renderBibleDifficulties(filtered, true);
+        }
+
         // Helper function to extract book name from Bible difficulty article
         // Uses pre-computed bible_verse field if available, falls back to title parsing
         function extractBookFromArticle(article) {
@@ -964,8 +1065,8 @@
                 return;
             }
 
-            // Display all articles
-            window.renderBibleDifficulties(window.bibleDifficulties);
+            // Display all articles (with source filters applied)
+            applySourceFilter();
 
             // Setup search - sync between original and overlay inputs
             const bibleDiffSearchOverlay = document.getElementById('bible-diff-search-overlay');
@@ -979,10 +1080,16 @@
                     if (el && el !== e.target) el.value = query;
                 });
 
-                // search within the filtered list (based on active book or all)
+                // search within the filtered list (based on active filters)
                 let searchWithin = window.bibleDifficulties;
+
+                // Apply source filter
+                if (activeSourceFilters.size > 0) {
+                    searchWithin = searchWithin.filter(article => !activeSourceFilters.has(article.source));
+                }
+
+                // Apply book filter
                 if (activeBook) {
-                    // Search within book-filtered articles
                     searchWithin = searchWithin.filter(article => {
                         const articleBook = extractBookFromArticle(article);
                         const normalizedBook = activeBook === 'Psalm' ? 'Psalms' : activeBook;
@@ -1029,7 +1136,7 @@
             }
 
             // Limit to first 100 to avoid overwhelming the DOM
-            const displayArticles = uniqueArticles.slice(0, 100);
+            const displayArticles = uniqueArticles.slice(0, 500); // Increased limit to 500
 
             const html = displayArticles.map(article => {
                 const book = extractBookFromArticle(article);
@@ -1084,15 +1191,7 @@
                 return;
             }
 
-            // Normalize book name (handle e.g., "Psalm" vs "Psalms")
-            const normalizedBook = book === 'Psalm' ? 'Psalms' : book;
-
-            const filtered = window.bibleDifficulties.filter(article => {
-                const articleBook = extractBookFromArticle(article);
-                return articleBook.toLowerCase() === normalizedBook.toLowerCase();
-            });
-
-            window.renderBibleDifficulties(filtered, true); // Skip dedup since already filtered from deduplicated list
+            applySourceFilter();
         };
 
         function selectBook(book) {
@@ -1129,8 +1228,8 @@
                     '<p class="text-gray-500">Click on a chapter to see details</p>';
                 document.getElementById('details-toggle').classList.add('hidden');
 
-                // Show all Bible difficulties when no book is selected
-                window.renderBibleDifficulties(window.bibleDifficulties || []);
+                // Show all Bible difficulties when no book is selected (with source filters applied)
+                applySourceFilter();
 
                 // Hide filter label
                 ['bible-diff-filter-label-container'].forEach(id => {
