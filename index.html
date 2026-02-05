@@ -219,8 +219,74 @@
             </div>
             <input type="text" id="search-input" placeholder="Search..."
                    class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 w-20 sm:w-36 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button onclick="toggleHelp()" class="text-gray-400 hover:text-blue-300 transition-colors" title="Help">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </button>
         </div>
     </header>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden" onclick="if(event.target===this) toggleHelp()">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl max-w-md w-full mx-4 max-h-[85vh] overflow-y-auto">
+            <div class="sticky top-0 bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-blue-400">How to Use</h2>
+                <button onclick="toggleHelp()" class="text-gray-400 hover:text-white">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="px-4 py-4 space-y-4 text-xs text-gray-300">
+                <div>
+                    <h3 class="font-semibold text-gray-100 mb-1">What You're Viewing</h3>
+                    <p class="leading-relaxed">Thousands of Bible cross-references mapped to Rainbow-colored themes. Each arc shows a connection between two verses, colored by the dominant theme of the source verse.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-semibold text-gray-100 mb-1">Navigate Visualization</h3>
+                    <ul class="space-y-1 ml-4 list-disc">
+                        <li><strong>Horizontally scroll</strong> to move through chapters</li>
+                        <li><strong>Click an arc</strong> to select a cross-reference</li>
+                        <li><strong>Use arrow buttons</strong> on canvas to step through arcs</li>
+                        <li><strong>Use keyboard arrows</strong> ← → for quick navigation</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-semibold text-gray-100 mb-1">View Details</h3>
+                    <ul class="space-y-1 ml-4 list-disc">
+                        <li><strong>Selected ARC</strong> shows in details panel with source/target verse text</li>
+                        <li><strong>Click a book</strong> in left sidebar to filter to its references</li>
+                        <li><strong>Bible Difficulties</strong> appear below arcs when scrolled</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-semibold text-gray-100 mb-1">Rainbow Themes</h3>
+                    <p class="leading-relaxed">Each color represents a theological theme (e.g., God=blue, Creation=green, Redemption=purple). Filter by theme using the sidebar.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-semibold text-gray-100 mb-1">Controls</h3>
+                    <ul class="space-y-1 ml-4 list-disc">
+                        <li><strong>Votes slider</strong> — filter cross-references by community votes</li>
+                        <li><strong>Arcs slider</strong> — limit number of visible arcs</li>
+                        <li><strong>Search</strong> — find specific books/chapters</li>
+                        <li><strong>Source filters</strong> — toggle Bible difficulties by source</li>
+                    </ul>
+                </div>
+
+                <div class="pt-2 border-t border-gray-700">
+                    <p class="text-gray-500 italic">Use the <kbd class="bg-gray-700 px-1.5 py-0.5 rounded text-[10px]">?</kbd> button to show/hide this help</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Mobile Controls Bar -->
     <div class="mobile-only bg-gray-800 border-b border-gray-700 px-3 py-2 flex items-center gap-3 flex-shrink-0">
@@ -266,13 +332,24 @@
         </aside>
 
         <!-- Visualization -->
-        <main class="flex-1 flex flex-col bg-gray-900">
-            <div id="viz-container" class="relative" style="flex: 1; overflow: visible;">
+        <main class="flex-1 flex flex-col bg-gray-900 overflow-hidden">
+            <div id="viz-container" class="relative overflow-x-auto overflow-y-hidden" style="flex: 1; min-width: 0;">
                 <canvas id="main-canvas"></canvas>
+                <!-- Navigation arrows for arcs -->
+                <button id="nav-left-arc" class="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 border border-gray-600 rounded-full flex items-center justify-center text-gray-300 transition-all z-10 hover:scale-110 active:scale-95 hidden">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+                <button id="nav-right-arc" class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 border border-gray-600 rounded-full flex items-center justify-center text-gray-300 transition-all z-10 hover:scale-110 active:scale-95 hidden">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
                 <div id="status-bar-overlay" class="absolute left-0 right-0 bg-gray-800 border-t border-gray-700 px-3 h-8 flex items-center text-xs text-gray-400 z-10 hidden" style="height: 32px;">
                     Hover over the visualization to explore
                 </div>
-                <div id="bible-diff-overlay" class="absolute left-0 right-0 border-t border-gray-700 bg-gray-800/50 z-10 hidden" style="bottom: 0; overflow-y: auto;">
+                <div id="bible-diff-overlay" class="absolute left-0 right-0 border-t border-gray-700 bg-gray-800/50 z-10 hidden" style="overflow-y: auto;">
                     <div class="px-2 sm:px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between">
                         <div class="flex items-center gap-2">
                             <h3 class="text-xs font-semibold text-gray-400 uppercase">Bible Difficulties</h3>
@@ -406,7 +483,7 @@
         let verseTexts = {};
         let crossRefs = {};
         let versePositions = {};
-        let chapters = [];
+        let chapters = [];  // Global chapters array - populated by buildStructure()
         let activeBook = null;
         let voteThreshold = 5;
         let arcLimit = 500;
@@ -419,11 +496,16 @@
         let activeTheme = null;  // Filter by theme
         let selectedArc = null;  // Currently selected arc from click
         let currentChapterView = null;  // Currently displayed chapter in details panel
-        
+
+        // Arc navigation state
+        let visibleArcsForNavigation = [];  // Current visible arcs
+        let currentArcIndex = -1;  // Currently selected arc by navigation (or -1 for none)
+        let currentArcId = null;  // ID of the currently selected arc
+
         // Canvas
         let canvas, ctx;
         let width, height;
-        
+
         // Pre-aggregated chapter data
         let chapterData = []; // { book, chapter, index, x, refCount, refs: [{toIndex, votes}] }
 
@@ -858,6 +940,9 @@
             }
 
             console.timeEnd('buildStructure');
+
+            // Make chapters globally accessible for navigation
+            window.chapters = chapters;
         }
 
         function buildThemeFilter() {
@@ -1418,10 +1503,11 @@
             window.layout = {
                 visible,
                 chapterWidth,
+                arcRowY,
+                arcAreaHeight,
                 margin,
                 arcTop,
                 arcBottom,
-                arcRowY,
                 histTop,
                 histHeight,
                 allArcs: []  // Store for hover detection
@@ -1442,25 +1528,17 @@
                 statusOverlay.style.display = 'flex';
 
                 // Position bible difficulties overlay below status bar
+                // Give it bottom: 0 so it fills remaining space and is scrollable
                 const statusHeight = 32;  // h-8 = 32px
                 bibleDiffOverlay.style.top = `${visualArcBottom + statusHeight}px`;
+                bibleDiffOverlay.style.bottom = '0';
                 bibleDiffOverlay.style.display = 'block';
             } else {
                 // Arcs are still above container, hide overlays
                 statusOverlay.style.display = 'none';
                 bibleDiffOverlay.style.display = 'none';
+                bibleDiffOverlay.style.bottom = 'auto';
             }
-
-            // Compute max ref count at verse level for histogram scaling
-            let maxVerseRefCount = 0;
-            visible.forEach(c => {
-                c.verseRefs.forEach(vr => {
-                    if (vr.refCount > maxVerseRefCount) {
-                        maxVerseRefCount = vr.refCount;
-                    }
-                });
-            });
-            const maxRef = Math.max(maxVerseRefCount, 1);
 
             // Draw reference line for arcs
             ctx.strokeStyle = '#374151';
@@ -1478,6 +1556,17 @@
                 // Store normalized position for hover detection
                 c.layoutX = x / window.devicePixelRatio;
             });
+
+            // Compute max ref count at verse level for histogram scaling
+            let maxVerseRefCount = 0;
+            visible.forEach(c => {
+                c.verseRefs.forEach(vr => {
+                    if (vr.refCount > maxVerseRefCount) {
+                        maxVerseRefCount = vr.refCount;
+                    }
+                });
+            });
+            const maxRef = Math.max(maxVerseRefCount, 1);
 
             // Draw arcs using verse-level arcs
             ctx.globalAlpha = 0.3;
@@ -1509,10 +1598,10 @@
             visibleArcs.sort((a, b) => b.votes - a.votes);
 
             const adaptiveArcLimit = visible.length < 20 ? arcLimit * 3 : arcLimit;
-            visibleArcs = visibleArcs.slice(0, adaptiveArcLimit);
+            const limitedVisibleArcs = visibleArcs.slice(0, adaptiveArcLimit);
 
             // Calculate x positions for each verse arc
-            for (const arc of visibleArcs) {
+            for (const arc of limitedVisibleArcs) {
                 // Calculate source X
                 const sourceChIdx = arc.sourcePos.chapterIdx;
                 const sourceCh = arc.sourceChapter;
@@ -1541,9 +1630,12 @@
                 const targetX = margin.left + targetVisibleIdx * chWidth + verseOffset;
 
                 allArcs.push({
+                    id: `${arc.sourceRef}->${arc.targetRef}`,  // Unique identifier
                     x1: sourceX,
                     x2: targetX,
                     y: arcRowY,
+                    y1: arcRowY,
+                    y2: arcRowY + (arcAreaHeight * 0.85),
                     height: arcAreaHeight * 0.85,  // Use 85% of vertical space
                     votes: arc.votes,
                     sourceColor: getVerseTheme(sourceCh.book, sourceCh.chapter, arc.sourcePos.verseIndex + 1).color,
@@ -1564,6 +1656,9 @@
 
             window.layout.allArcs = allArcs;
 
+            // Store processed arcs for navigation (after they have x positions and theme info)
+            visibleArcsForNavigation = allArcs;
+
             // Determine which arcs to draw last (on top)
             const hoveredArcToDrawLast = hoveredArc;
             const isAnyHovered = !!hoveredArc;
@@ -1571,7 +1666,9 @@
 
             for (const arc of allArcs) {
                 // Skip hovered/selected arcs - we'll draw them last
-                if (arc === hoveredArcToDrawLast || arc === selectedArc) continue;
+                const arcIsHovered = hoveredArcToDrawLast && arc.id === hoveredArcToDrawLast.id;
+                const arcIsSelected = selectedArc && arc.id === selectedArc.id;
+                if (arcIsHovered || arcIsSelected) continue;
 
                 const dx = Math.abs(arc.x2 - arc.x1);
                 const minDrawDist = 10; // Minimum horizontal distance to draw
@@ -1595,7 +1692,7 @@
                 }
 
                 // Fade all arcs more if something is hovered or selected
-                if ((isAnyHovered || isAnySelected) && arc !== hoveredArcToDrawLast && arc !== selectedArc) {
+                if ((isAnyHovered || isAnySelected) && !arcIsHovered && !arcIsSelected) {
                     baseOpacity *= 0.15;
                 }
 
@@ -1604,41 +1701,44 @@
 
             ctx.globalAlpha = 1;
 
-            // Draw selected arc (if any)
+            // Draw selected arc on top (if any)
             if (selectedArc) {
-                const arc = selectedArc;
-                const dx = Math.abs(arc.x2 - arc.x1);
-                if (dx >= 10) {
-                    drawGradientArc(ctx, arc, 0.85, true);
+                const arc = allArcs.find(a => a.id === selectedArc.id);
+                if (arc) {
+                    const dx = Math.abs(arc.x2 - arc.x1);
+                    if (dx >= 10) {
+                        drawGradientArc(ctx, arc, 0.85, true);
+                    }
                 }
             }
 
-            // Draw hovered arc on top (before other UI, we'll redraw highlighted ticks after)
+            // Draw hovered arc on top
             if (hoveredArcToDrawLast) {
-                const arc = hoveredArcToDrawLast;
-                const dx = Math.abs(arc.x2 - arc.x1);
-                if (dx >= 10) { // Only draw if sufficient distance
-                    drawGradientArc(ctx, arc, 1.0, true);
+                const arc = allArcs.find(a => a.id === hoveredArcToDrawLast.id);
+                if (arc) {
+                    const dx = Math.abs(arc.x2 - arc.x1);
+                    if (dx >= 10) { // Only draw if sufficient distance
+                        drawGradientArc(ctx, arc, 1.0, true);
 
-                    // Redraw highlighted tick marks on top of the hovered arc
-                    visible.forEach((c, i) => {
-                        const hoveredSourceX = hoveredArcToDrawLast.x1;
-                        const hoveredTargetX = hoveredArcToDrawLast.x2;
-                        const myX = c.x;
-                        const isHighlighted =
-                            Math.abs(hoveredSourceX - myX) < chapterWidth / 2 ||
-                            Math.abs(hoveredTargetX - myX) < chapterWidth / 2;
+                        // Redraw highlighted tick marks on top of the hovered arc
+                        visible.forEach((c, i) => {
+                            const hoveredSourceX = arc.x1;
+                            const hoveredTargetX = arc.x2;
+                            const myX = c.x;
+                            const isHighlighted =
+                                Math.abs(hoveredSourceX - myX) < chapterWidth / 2 ||
+                                Math.abs(hoveredTargetX - myX) < chapterWidth / 2;
 
-                        if (isHighlighted) {
-                            ctx.beginPath();
-                            ctx.moveTo(c.x, arcRowY);
-                            ctx.lineTo(c.x, arcRowY + 4);
-                            // Use source color for gradient arcs
-                            ctx.strokeStyle = hoveredArcToDrawLast.sourceColor;
-                            ctx.lineWidth = 2.5;
-                            ctx.stroke();
-                        }
-                    });
+                            if (isHighlighted) {
+                                ctx.beginPath();
+                                ctx.moveTo(c.x, arcRowY);
+                                ctx.lineTo(c.x, arcRowY + 4);
+                                ctx.strokeStyle = arc.sourceColor;
+                                ctx.lineWidth = 2.5;
+                                ctx.stroke();
+                            }
+                        });
+                    }
                 }
             }
 
@@ -1817,10 +1917,19 @@
             const clickedArc = findArcAtPosition(x, y);
             if (clickedArc) {
                 selectedArc = clickedArc;
+                const arcId = clickedArc.id;
                 // Focus on the source chapter of the selected arc
                 currentChapterView = chapters[clickedArc.sourcePos.chapterIdx];
                 showDetails(currentChapterView);
                 render(); // Re-render to show arc selection
+                // AFTER render, find the arc in the NEW navigation array
+                const navIndex = visibleArcsForNavigation.findIndex(a => a.id === arcId);
+                if (navIndex !== -1) {
+                    currentArcIndex = navIndex;
+                } else {
+                    currentArcIndex = visibleArcsForNavigation.length > 0 ? 0 : -1;
+                }
+                currentArcId = arcId;
                 return;
             }
 
@@ -2268,9 +2377,133 @@
             }
         }
 
+        // Arc navigation functions
+        function navigateArc(direction) {
+            if (visibleArcsForNavigation.length === 0) return;
+
+            if (direction === 'next') {
+                currentArcIndex = (currentArcIndex + 1) % visibleArcsForNavigation.length;
+            } else if (direction === 'prev') {
+                currentArcIndex = (currentArcIndex - 1 + visibleArcsForNavigation.length) % visibleArcsForNavigation.length;
+            }
+
+            const arc = visibleArcsForNavigation[currentArcIndex];
+            currentArcId = arc.id;
+
+            // Show tooltip with the arc data we have
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.left = (arc.x1 + arc.x2) / 2 - 100 + 'px';
+            tooltip.style.top = (arc.y1 + arc.y2) / 2 - 60 + 'px';
+
+            tooltip.innerHTML = `
+                <div class="flex items-center gap-1 mb-1">
+                    <span class="w-2 h-2 rounded-full" style="background-color: ${arc.sourceColor}"></span>
+                    <strong>${arc.sourceTheme.name}</strong>
+                </div>
+                <div class="text-green-400">${arc.sourceRef}</div>
+                <div class="text-center text-gray-400 text-xs">↓ ${arc.votes} votes ↓</div>
+                <div class="text-blue-400">${arc.targetRef}</div>
+            `;
+            tooltip.classList.remove('hidden');
+
+            // Scroll to view the arc if needed
+            scrollToArc(arc);
+
+            // Set selectedArc for persistent selection (renders use this)
+            selectedArc = arc;
+
+            // Also focus on the source chapter for the details panel
+            // The chapters array should be available globally from buildStructure
+            if (arc.sourcePos && arc.sourcePos.chapterIdx >= 0) {
+                const allChapters = chapters || window.chapters || [];
+                if (arc.sourcePos.chapterIdx < allChapters.length) {
+                    currentChapterView = allChapters[arc.sourcePos.chapterIdx];
+                    showDetails(currentChapterView);
+                    render();
+                    return;
+                }
+            }
+
+            render();
+
+            // After render, update selectedArc from the new allArcs using the ID
+            const newAllArcs = window.layout?.allArcs || [];
+            selectedArc = newAllArcs.find(a => a.id === currentArcId) || null;
+        }
+
+        function scrollToArc(arc, margin = { left: 15, right: 15 }) {
+            const centerPoint = (arc.x1 + arc.x2) / 2;
+            const visibleWidth = width - margin.left - margin.right;
+
+            // Try to access chapters through the global scope or from render context
+            let allChapters = window.chapters;
+            if (!allChapters) {
+                // Fallback: approximate using the arc's chapter indices
+                const chapterStep = visibleWidth / 1189; // total chapters
+                const chapterAtCenter = Math.round((centerPoint - margin.left) / chapterStep);
+                const targetScrollLeft = Math.max(0, chapterAtCenter * chapterStep - visibleWidth / 2);
+
+                const vizContainer = document.getElementById('viz-container');
+                if (vizContainer) {
+                    vizContainer.scrollLeft = targetScrollLeft;
+                }
+                return;
+            }
+
+            const chapterStep = visibleWidth / allChapters.length;
+            const chapterAtCenter = Math.round((centerPoint - margin.left) / chapterStep);
+            const targetScrollLeft = Math.max(0, chapterAtCenter * chapterStep - visibleWidth / 2);
+
+            const vizContainer = document.getElementById('viz-container');
+            if (vizContainer) {
+                vizContainer.scrollLeft = targetScrollLeft;
+            }
+        }
+
+        function setupArcNavigation() {
+            const leftBtn = document.getElementById('nav-left-arc');
+            const rightBtn = document.getElementById('nav-right-arc');
+
+            function updateNavButtonsVisibility() {
+                const hasArcs = visibleArcsForNavigation.length > 0;
+                if (hasArcs) {
+                    leftBtn.classList.remove('hidden');
+                    rightBtn.classList.remove('hidden');
+                } else {
+                    leftBtn.classList.add('hidden');
+                    rightBtn.classList.add('hidden');
+                }
+            }
+
+            if (leftBtn) {
+                leftBtn.addEventListener('click', () => navigateArc('prev'));
+            }
+            if (rightBtn) {
+                rightBtn.addEventListener('click', () => navigateArc('next'));
+            }
+
+            // Keyboard navigation (left/right arrows)
+            document.addEventListener('keydown', (e) => {
+                // Only navigate if not in an input field
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    navigateArc(e.key === 'ArrowLeft' ? 'prev' : 'next');
+                }
+            });
+
+            const originalRender = window.render;
+            window.render = function() {
+                originalRender.apply(this, arguments);
+                updateNavButtonsVisibility();
+            };
+        }
+
         window.onload = async function() {
             await init();
             setupMobileDrawers();
+            setupArcNavigation();
         };
 
             // Animation loop for hover effects
