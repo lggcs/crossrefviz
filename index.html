@@ -2377,6 +2377,16 @@
             }
         }
 
+        // Help modal toggle
+        window.toggleHelp = function() {
+            const modal = document.getElementById('help-modal');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        };
+
         // Arc navigation functions
         function navigateArc(direction) {
             if (visibleArcsForNavigation.length === 0) return;
