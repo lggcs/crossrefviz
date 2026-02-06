@@ -1344,7 +1344,106 @@
                     if (el) el.placeholder = 'Search questions...';
                 });
             }
+
+            // Re-run verse search if one is active
+            if (searchQuery && isVerseSearch) {
+                performVerseSearch(searchQuery, null);  // Don't auto-render, we'll call it below
+            }
+
             render();
+        }
+
+        // Perform verse search (can be called from input handler or book filter change)
+        function performVerseSearch(query, callback) {
+            // Try to parse as Bible verse reference (e.g., "john 3:16", "gen 1:1-3")
+            const verseRefMatch = query.match(/^([a-z0-9]+)\s*(\d+)(?::(\d+)(?:-(\d+))?)?$/);
+            if (verseRefMatch) {
+                const bookPart = verseRefMatch[1].toLowerCase();
+                const chapter = parseInt(verseRefMatch[2]);
+                const verseStart = verseRefMatch[3] ? parseInt(verseRefMatch[3]) : null;
+                const verseEnd = verseRefMatch[4] ? parseInt(verseRefMatch[4]) : null;
+
+                // Find matching book
+                const bookNames = BOOK_NAMES.filter(b =>
+                    b.toLowerCase() === bookPart ||
+                    b.toLowerCase().startsWith(bookPart) ||
+                    bookPart === b.toLowerCase().replace(/\s/g, '').substring(0, bookPart.length)
+                );
+
+                if (bookNames.length > 0) {
+                    isVerseSearch = true;
+                    const book = bookNames[0];
+                    // Get lookup book name for verse text
+                    const lookupBook = normalizeBookNameForText(book);
+
+                    // Clear previous search verse refs
+                    searchVerseRefs = [];
+
+                    if (verseStart !== null) {
+                        // Specific verse or verse range
+                        if (verseEnd !== null) {
+                            // Range of verses (e.g., Genesis 1:1-3)
+                            for (let v = verseStart; v <= verseEnd; v++) {
+                                searchVerseRefs.push(`${book} ${chapter}:${v}`);
+                            }
+                        } else {
+                            // Single verse (e.g., John 3:16)
+                            searchVerseRefs.push(`${book} ${chapter}:${verseStart}`);
+                        }
+                    } else {
+                        // Whole chapter (e.g., Genesis 1) - add all verses
+                        let v = 1;
+                        while (verseTexts[`${lookupBook} ${chapter}:${v}`]) {
+                            searchVerseRefs.push(`${book} ${chapter}:${v}`);
+                            v++;
+                        }
+                    }
+
+                    // For verse search: find arcs that have source or target matching the search verse(s)
+                    // Only show direct connections, not traversed connections
+                    searchConnectedVerseRefs = new Set(searchVerseRefs);
+
+                    // Find direct incoming and outgoing references for each search verse
+                    for (const searchVerse of searchVerseRefs) {
+                        // Outgoing: target verses
+                        const outgoing = crossRefs[searchVerse] || [];
+                        for (const ref of outgoing) {
+                            searchConnectedVerseRefs.add(ref.to);
+                        }
+
+                        // Incoming: source verses (using reverse index)
+                        const incoming = incomingRefs[searchVerse] || [];
+                        for (const ref of incoming) {
+                            searchConnectedVerseRefs.add(ref.source);
+                        }
+                    }
+
+                    // Find arcs that connect to/from the search verses
+                    // If a book filter is active, also require that the arc connects to that book
+                    searchArcIds.clear();
+                    for (const arc of window.verseArcs || []) {
+                        if (searchArcIds.size < 1000) {  // Limit for performance
+                            const arcId = `${arc.sourceRef}->${arc.targetRef}`;
+                            const connectsToSearchVerse = searchVerseRefs.includes(arc.sourceRef) ||
+                                                        searchVerseRefs.includes(arc.targetRef);
+
+                            if (!connectsToSearchVerse) continue;
+
+                            // If a book filter is active, require that the arc connects to that book
+                            if (activeBook) {
+                                const connectsToBook = arc.sourceRef.startsWith(activeBook + ' ') ||
+                                                      arc.targetRef.startsWith(activeBook + ' ');
+                                if (!connectsToBook) continue;
+                            }
+
+                            searchArcIds.add(arcId);
+                        }
+                    }
+
+                    console.log(`Search: ${searchVerseRefs.length} search verses → ${searchConnectedVerseRefs.size} connected verses → ${searchArcIds.size} arcs`);
+                }
+            }
+            if (callback) callback();
         }
 
         function resize() {
@@ -1420,92 +1519,7 @@
                         return;
                     }
 
-                    // Try to parse as Bible verse reference (e.g., "john 3:16", "gen 1:1-3")
-                    const verseRefMatch = query.match(/^([a-z0-9]+)\s*(\d+)(?::(\d+)(?:-(\d+))?)?$/);
-                    if (verseRefMatch) {
-                        const bookPart = verseRefMatch[1].toLowerCase();
-                        const chapter = parseInt(verseRefMatch[2]);
-                        const verseStart = verseRefMatch[3] ? parseInt(verseRefMatch[3]) : null;
-                        const verseEnd = verseRefMatch[4] ? parseInt(verseRefMatch[4]) : null;
-
-                        // Find matching book
-                        const bookNames = BOOK_NAMES.filter(b =>
-                            b.toLowerCase() === bookPart ||
-                            b.toLowerCase().startsWith(bookPart) ||
-                            bookPart === b.toLowerCase().replace(/\s/g, '').substring(0, bookPart.length)
-                        );
-
-                        if (bookNames.length > 0) {
-                            isVerseSearch = true;
-                            const book = bookNames[0];
-                            // Get lookup book name for verse text
-                            const lookupBook = normalizeBookNameForText(book);
-
-                            if (verseStart !== null) {
-                                // Specific verse or verse range
-                                if (verseEnd !== null) {
-                                    // Range of verses (e.g., Genesis 1:1-3)
-                                    for (let v = verseStart; v <= verseEnd; v++) {
-                                        searchVerseRefs.push(`${book} ${chapter}:${v}`);
-                                    }
-                                } else {
-                                    // Single verse (e.g., John 3:16)
-                                    searchVerseRefs.push(`${book} ${chapter}:${verseStart}`);
-                                }
-                            } else {
-                                // Whole chapter (e.g., Genesis 1) - add all verses
-                                let v = 1;
-                                while (verseTexts[`${lookupBook} ${chapter}:${v}`]) {
-                                    searchVerseRefs.push(`${book} ${chapter}:${v}`);
-                                    v++;
-                                }
-                            }
-
-                            // For verse search: find arcs that have source or target matching the search verse(s)
-                            // Only show direct connections, not traversed connections
-                            searchConnectedVerseRefs = new Set(searchVerseRefs);
-
-                            // Find direct incoming and outgoing references for each search verse
-                            for (const searchVerse of searchVerseRefs) {
-                                // Outgoing: target verses
-                                const outgoing = crossRefs[searchVerse] || [];
-                                for (const ref of outgoing) {
-                                    searchConnectedVerseRefs.add(ref.to);
-                                }
-
-                                // Incoming: source verses (using reverse index)
-                                const incoming = incomingRefs[searchVerse] || [];
-                                for (const ref of incoming) {
-                                    searchConnectedVerseRefs.add(ref.source);
-                                }
-                            }
-
-                            // Find arcs that connect to/from the search verses
-                            // If a book filter is active, also require that the arc connects to that book
-                            for (const arc of window.verseArcs || []) {
-                                if (searchArcIds.size < 1000) {  // Limit for performance
-                                    const arcId = `${arc.sourceRef}->${arc.targetRef}`;
-                                    const connectsToSearchVerse = searchVerseRefs.includes(arc.sourceRef) ||
-                                                                searchVerseRefs.includes(arc.targetRef);
-
-                                    if (!connectsToSearchVerse) continue;
-
-                                    // If a book filter is active, require that the arc connects to that book
-                                    if (activeBook) {
-                                        const connectsToBook = arc.sourceRef.startsWith(activeBook + ' ') ||
-                                                              arc.targetRef.startsWith(activeBook + ' ');
-                                        if (!connectsToBook) continue;
-                                    }
-
-                                    searchArcIds.add(arcId);
-                                }
-                            }
-
-                            console.log(`Search: ${searchVerseRefs.length} search verses → ${searchConnectedVerseRefs.size} connected verses → ${searchArcIds.size} arcs`);
-                        }
-                    }
-
-                    render();
+                    performVerseSearch(query, render);
                 }, 200);
             };
             window.onresize = () => { resize(); };
