@@ -499,6 +499,12 @@
         let mouseX = 0, mouseY = 0;
         let verseThemes = {};  // Rainbow Bible theme mapping
 
+        // Performance: memoization cache for verse reference matching
+        const verseMatchCache = new Map();  // key: "searchRef|dbVerse", value: boolean
+
+        // Performance: cached set of bible verses for faster lookup
+        let bibleVerseSet = new Set();  // Set of all verse refs for O(1) lookup
+
         // State
         let activeTheme = null;  // Filter by theme
         let selectedArc = null;  // Currently selected arc from click
@@ -508,6 +514,10 @@
         let visibleArcsForNavigation = [];  // Current visible arcs
         let currentArcIndex = -1;  // Currently selected arc by navigation (or -1 for none)
         let currentArcId = null;  // ID of the currently selected arc
+
+        // Performance: render batching to avoid excessive renders
+        let renderPending = false;
+        let renderFrame = null;
 
         // Canvas
         let canvas, ctx;
@@ -719,7 +729,20 @@
                     // Use bible_verse field for simpler mapping
                     window.bibleDifficulties = rawData;
 
+                    // Build a Set of all unique verse references from bible_difficulties
+                    // for faster O(1) lookup during search/filtering
+                    bibleVerseSet = new Set();
+                    for (const article of rawData) {
+                        if (article.bible_verse) {
+                            const verses = Array.isArray(article.bible_verse) ? article.bible_verse : [article.bible_verse];
+                            for (const verse of verses) {
+                                bibleVerseSet.add(String(verse));
+                            }
+                        }
+                    }
+
                     console.log(`Loaded ${window.bibleDifficulties.length} articles from bible_difficulties.json`);
+                    console.log(`Built cache with ${bibleVerseSet.size} unique verse references`);
                 } catch (e) {
                     console.warn('Could not load bible_difficulties.json:', e);
                     window.bibleDifficulties = [];
@@ -1178,6 +1201,9 @@
             const bibleDiffSearchOverlay = document.getElementById('bible-diff-search-overlay');
             const bibleDiffSearchContainer = document.getElementById('bible-diff-search-container');
 
+            // Debounced search for better performance
+            let bibleDiffSearchTimeout = null;
+
             const handleBibleDiffSearch = (e) => {
                 const query = e.target.value.toLowerCase();
 
@@ -1186,30 +1212,34 @@
                     if (el && el !== e.target) el.value = query;
                 });
 
-                // Start with verse-filtered results if available, otherwise use all
-                let searchWithin = verseFilteredBibleDifficulties.length > 0
-                    ? verseFilteredBibleDifficulties
-                    : window.bibleDifficulties;
+                // Debounce search to avoid repeated filtering
+                clearTimeout(bibleDiffSearchTimeout);
+                bibleDiffSearchTimeout = setTimeout(() => {
+                    // Start with verse-filtered results if available, otherwise use all
+                    let searchWithin = verseFilteredBibleDifficulties.length > 0
+                        ? verseFilteredBibleDifficulties
+                        : window.bibleDifficulties;
 
-                // Apply source filter
-                if (activeSourceFilters.size > 0) {
-                    searchWithin = searchWithin.filter(article => !activeSourceFilters.has(article.source));
-                }
+                    // Apply source filter
+                    if (activeSourceFilters.size > 0) {
+                        searchWithin = searchWithin.filter(article => !activeSourceFilters.has(article.source));
+                    }
 
-                // Apply book filter (if not already filtered by verse search)
-                if (activeBook && verseFilteredBibleDifficulties.length === 0) {
-                    searchWithin = searchWithin.filter(article => {
-                        const articleBook = extractBookFromArticle(article);
-                        const normalizedBook = activeBook === 'Psalm' ? 'Psalms' : activeBook;
-                        return articleBook.toLowerCase() === normalizedBook.toLowerCase();
-                    });
-                }
+                    // Apply book filter (if not already filtered by verse search)
+                    if (activeBook && verseFilteredBibleDifficulties.length === 0) {
+                        searchWithin = searchWithin.filter(article => {
+                            const articleBook = extractBookFromArticle(article);
+                            const normalizedBook = activeBook === 'Psalm' ? 'Psalms' : activeBook;
+                            return articleBook.toLowerCase() === normalizedBook.toLowerCase();
+                        });
+                    }
 
-                // Search by title
-                const filtered = searchWithin.filter(article =>
-                    article.title.toLowerCase().includes(query)
-                );
-                window.renderBibleDifficulties(filtered, true); // Skip dedup since source is already filtered
+                    // Search by title
+                    const filtered = searchWithin.filter(article =>
+                        article.title.toLowerCase().includes(query)
+                    );
+                    window.renderBibleDifficulties(filtered, true); // Skip dedup since source is already filtered
+                }, 150); // 150ms debounce
             };
 
             bibleDiffSearchOverlay && (bibleDiffSearchOverlay.oninput = handleBibleDiffSearch);
@@ -1244,8 +1274,8 @@
                 });
             }
 
-            // Limit to first 100 to avoid overwhelming the DOM
-            const displayArticles = uniqueArticles.slice(0, 500); // Increased limit to 500
+            // Limit render to 50 items for better performance on initial load
+            const displayArticles = uniqueArticles.slice(0, 50);
 
             const html = displayArticles.map(article => {
                 const book = extractBookFromArticle(article);
@@ -1278,10 +1308,10 @@
                 `;
             }).join('');
 
-            if (uniqueArticles.length > 100) {
+            if (uniqueArticles.length > 50) {
                 const moreHtml = `
                     <p class="text-gray-500 text-center py-2 text-[10px]">
-                        Showing 100 of ${uniqueArticles.length} questions. Search for specific topics.
+                        Showing 50 of ${uniqueArticles.length} questions. Search for specific topics.
                     </p>
                 `;
                 containers.forEach(container => {
@@ -1463,6 +1493,12 @@
             // Direct match
             if (searchRef === dbVerse) return true;
 
+            // Check cache
+            const cacheKey = searchRef + '|' + dbVerse;
+            if (verseMatchCache.has(cacheKey)) {
+                return verseMatchCache.get(cacheKey);
+            }
+
             // Try to normalize both references for comparison
             const normalizeRef = (ref) => {
                 const parts = ref.split(' ');
@@ -1498,12 +1534,18 @@
                     book = abbreviations[book];
                 }
 
-                return `${book} ${rest}`;
+                return book + ' ' + rest;
             };
 
             try {
-                return normalizeRef(searchRef) === normalizeRef(dbVerse);
+                const result = normalizeRef(searchRef) === normalizeRef(dbVerse);
+                // Cache the result (limit cache size to 1000 entries to prevent memory issues)
+                if (verseMatchCache.size < 1000) {
+                    verseMatchCache.set(cacheKey, result);
+                }
+                return result;
             } catch (e) {
+                verseMatchCache.set(cacheKey, false);
                 return false;
             }
         }
@@ -1715,11 +1757,19 @@
         }
 
         function render() {
-            ctx.fillStyle = '#111827';
-            ctx.fillRect(0, 0, width, height);
+            // Batch render requests using requestAnimationFrame
+            if (renderPending) return;
 
-            const visible = getVisibleChapters();
-            if (visible.length === 0) return;
+            renderPending = true;
+
+            renderFrame = requestAnimationFrame(() => {
+                renderPending = false;
+
+                ctx.fillStyle = '#111827';
+                ctx.fillRect(0, 0, width, height);
+
+                const visible = getVisibleChapters();
+                if (visible.length === 0) return;
 
             // Layout - arcs take up most space, histogram directly below
             const margin = { left: 15, right: 15 };
@@ -2130,27 +2180,40 @@
                 const el = document.getElementById(id);
                 if (el) el.textContent = statusText;
             });
+            }); // End of requestAnimationFrame callback
         }
 
+        // Performance: throttle hover updates
+        let hoverTimeout = null;
+        let lastHoverChapter = null;
+
         function handleHover(e) {
-            const rect = canvas.getBoundingClientRect();
-            const dpr = window.devicePixelRatio;
-            const x = (e.clientX - rect.left) * dpr;  // Canvas coordinates
-            const y = (e.clientY - rect.top) * dpr;
+            // Debounce hover for better performance
+            clearTimeout(hoverTimeout);
+            hoverTimeout = setTimeout(() => {
+                const rect = canvas.getBoundingClientRect();
+                const dpr = window.devicePixelRatio;
+                const x = (e.clientX - rect.left) * dpr;  // Canvas coordinates
+                const y = (e.clientY - rect.top) * dpr;
 
-            const layout = window.layout;
-            if (!layout) return;
+                const layout = window.layout;
+                if (!layout) return;
 
-            // Find chapter - layout.margin.left and layout.chapterWidth are in canvas coordinates
-            const idx = Math.floor((x - layout.margin.left) / layout.chapterWidth);
-            if (idx >= 0 && idx < layout.visible.length) {
-                const ch = layout.visible[idx];
-                const html = `<span class="text-blue-400">${ch.book} ${ch.chapter}</span> • ${ch.refCount} refs • Click for details`;
-                ['status-bar', 'status-bar-overlay'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.innerHTML = html;
-                });
-            }
+                // Find chapter - layout.margin.left and layout.chapterWidth are in canvas coordinates
+                const idx = Math.floor((x - layout.margin.left) / layout.chapterWidth);
+                if (idx >= 0 && idx < layout.visible.length) {
+                    const ch = layout.visible[idx];
+                    // Skip if already showing this chapter
+                    if (lastHoverChapter === `${ch.book} ${ch.chapter}`) return;
+                    lastHoverChapter = `${ch.book} ${ch.chapter}`;
+
+                    const html = `<span class="text-blue-400">${ch.book} ${ch.chapter}</span> • ${ch.refCount} refs • Click for details`;
+                    ['status-bar', 'status-bar-overlay'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.innerHTML = html;
+                    });
+                }
+            }, 16); // ~60fps throttle
         }
 
         function handleClick(e) {
