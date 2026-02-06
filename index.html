@@ -486,6 +486,7 @@
         let incomingRefs = {};  // Reverse index: target verse -> array of source verses
         let versePositions = {};
         let chapters = [];  // Global chapters array - populated by buildStructure()
+        let verseFilteredBibleDifficulties = [];  // Bible difficulties filtered by verse search
         let activeBook = null;
         let voteThreshold = 5;
         let arcLimit = 500;
@@ -1140,7 +1141,9 @@
         function extractBookFromArticle(article) {
             // Use pre-computed bible_verse if available (simpler, more accurate)
             if (article.bible_verse) {
-                return article.bible_verse.split(' ')[0];  // Just the book name part
+                // bible_verse can be a string or an array
+                const verseRef = Array.isArray(article.bible_verse) ? article.bible_verse[0] : article.bible_verse;
+                return String(verseRef).split(' ')[0];  // Just the book name part
             }
 
             // Fallback to title parsing if bible_verse not available
@@ -1183,16 +1186,18 @@
                     if (el && el !== e.target) el.value = query;
                 });
 
-                // search within the filtered list (based on active filters)
-                let searchWithin = window.bibleDifficulties;
+                // Start with verse-filtered results if available, otherwise use all
+                let searchWithin = verseFilteredBibleDifficulties.length > 0
+                    ? verseFilteredBibleDifficulties
+                    : window.bibleDifficulties;
 
                 // Apply source filter
                 if (activeSourceFilters.size > 0) {
                     searchWithin = searchWithin.filter(article => !activeSourceFilters.has(article.source));
                 }
 
-                // Apply book filter
-                if (activeBook) {
+                // Apply book filter (if not already filtered by verse search)
+                if (activeBook && verseFilteredBibleDifficulties.length === 0) {
                     searchWithin = searchWithin.filter(article => {
                         const articleBook = extractBookFromArticle(article);
                         const normalizedBook = activeBook === 'Psalm' ? 'Psalms' : activeBook;
@@ -1200,6 +1205,7 @@
                     });
                 }
 
+                // Search by title
                 const filtered = searchWithin.filter(article =>
                     article.title.toLowerCase().includes(query)
                 );
@@ -1345,9 +1351,12 @@
                 });
             }
 
-            // Re-run verse search if one is active
+            // Re-run verse search if one is active (updates both arcs and Bible difficulties)
             if (searchQuery && isVerseSearch) {
                 performVerseSearch(searchQuery, null);  // Don't auto-render, we'll call it below
+            } else {
+                // If no verse search, apply normal source filter
+                applySourceFilter();
             }
 
             render();
@@ -1441,9 +1450,89 @@
                     }
 
                     console.log(`Search: ${searchVerseRefs.length} search verses → ${searchConnectedVerseRefs.size} connected verses → ${searchArcIds.size} arcs`);
+
+                    // Also filter Bible difficulties to show only relevant articles
+                    filterBibleDifficultiesByVerse(searchVerseRefs);
                 }
             }
             if (callback) callback();
+        }
+
+        // Helper function to match verse references with different book name formats
+        function verseRefsMatch(searchRef, dbVerse) {
+            // Direct match
+            if (searchRef === dbVerse) return true;
+
+            // Try to normalize both references for comparison
+            const normalizeRef = (ref) => {
+                const parts = ref.split(' ');
+                let book = parts[0];
+                const rest = parts.slice(1).join(' ');  // "1:28"
+
+                // Handle common book abbreviations
+                const abbreviations = {
+                    'Gen': 'Genesis', 'Exod': 'Exodus', 'Ex': 'Exodus',
+                    'Lev': 'Leviticus', 'Num': 'Numbers', 'Deut': 'Deuteronomy',
+                    'Josh': 'Joshua', 'Judg': 'Judges', 'Ruth': 'Ruth',
+                    '1Sam': '1 Samuel', '2Sam': '2 Samuel', '1Kgs': '1 Kings', '2Kgs': '2 Kings',
+                    '1Chron': '1 Chronicles', '2Chron': '2 Chronicles', 'Ezra': 'Ezra', 'Neh': 'Nehemiah',
+                    'Esther': 'Esther', 'Job': 'Job', 'Ps': 'Psalms', 'Psalm': 'Psalms',
+                    'Prov': 'Proverbs', 'Eccl': 'Ecclesiastes', 'Song': 'Song of Solomon',
+                    'Isa': 'Isaiah', 'Jer': 'Jeremiah', 'Lam': 'Lamentations', 'Ezek': 'Ezekiel',
+                    'Dan': 'Daniel', 'Hos': 'Hosea', 'Joel': 'Joel', 'Amos': 'Amos',
+                    'Obad': 'Obadiah', 'Jonah': 'Jonah', 'Mic': 'Micah', 'Nahum': 'Nahum',
+                    'Hab': 'Habakkuk', 'Zeph': 'Zephaniah', 'Hag': 'Haggai', 'Zech': 'Zechariah',
+                    'Mal': 'Malachi', 'Matt': 'Matthew', 'Mk': 'Mark', 'Mk': 'Mark',
+                    'Lk': 'Luke', 'John': 'John', 'Jn': 'John', 'Acts': 'Acts',
+                    'Rom': 'Romans', '1Cor': '1 Corinthians', '2Cor': '2 Corinthians',
+                    'Gal': 'Galatians', 'Eph': 'Ephesians', 'Phil': 'Philippians',
+                    'Col': 'Colossians', '1Thess': '1 Thessalonians', '2Thess': '2 Thessalonians',
+                    '1Tim': '1 Timothy', '2Tim': '2 Timothy', 'Titus': 'Titus', 'Phlm': 'Philemon',
+                    'Heb': 'Hebrews', 'Jas': 'James', '1Pet': '1 Peter', '2Pet': '2 Peter',
+                    '1John': '1 John', '2John': '2 John', '3John': '3 John',
+                    'Jude': 'Jude', 'Rev': 'Revelation'
+                };
+
+                // Normalize book name
+                if (abbreviations[book]) {
+                    book = abbreviations[book];
+                }
+
+                return `${book} ${rest}`;
+            };
+
+            try {
+                return normalizeRef(searchRef) === normalizeRef(dbVerse);
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // Filter Bible difficulties by verse references
+        function filterBibleDifficultiesByVerse(verseRefs) {
+            if (!window.bibleDifficulties || window.bibleDifficulties.length === 0) return;
+
+            // Find articles whose bible_verse field matches any of the search verses
+            const filtered = window.bibleDifficulties.filter(article => {
+                if (!article.bible_verse) return false;
+
+                // bible_verse can be a single verse or array
+                const verses = Array.isArray(article.bible_verse) ? article.bible_verse : [article.bible_verse];
+
+                // Check if any verse matches (using flexible matching)
+                return verses.some(dbVerse => verseRefs.some(searchRef => verseRefsMatch(searchRef, dbVerse)));
+            });
+
+            // Store for further filtering (by source or search text)
+            verseFilteredBibleDifficulties = filtered;
+
+            // Apply source filters to the verse search results
+            if (activeSourceFilters.size > 0) {
+                const withSourceFilter = filtered.filter(article => !activeSourceFilters.has(article.source));
+                window.renderBibleDifficulties(withSourceFilter, true);
+            } else {
+                window.renderBibleDifficulties(filtered, true);
+            }
         }
 
         function resize() {
@@ -1507,17 +1596,24 @@
                     const query = e.target.value.toLowerCase().trim();
                     searchQuery = query;
 
+                    // Only process if query is non-empty
+                    if (!query) {
+                        searchVerseRefs = [];
+                        searchConnectedVerseRefs.clear();
+                        searchArcIds.clear();
+                        verseFilteredBibleDifficulties = [];  // Clear verse-filtered Bible difficulties
+                        isVerseSearch = false;
+                        applySourceFilter();  // Reset Bible difficulties to normal
+                        render();
+                        return;
+                    }
+
                     // Reset search state
                     searchVerseRefs = [];
                     searchConnectedVerseRefs.clear();
                     searchArcIds.clear();
                     isVerseSearch = false;
-
-                    // Only process if query is non-empty
-                    if (!query) {
-                        render();
-                        return;
-                    }
+                    verseFilteredBibleDifficulties = [];
 
                     performVerseSearch(query, render);
                 }, 200);
