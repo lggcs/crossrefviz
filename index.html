@@ -1162,28 +1162,43 @@
         // Helper function to extract book name from Bible difficulty article
         // Uses pre-computed bible_verse field if available, falls back to title parsing
         function extractBookFromArticle(article) {
-            // Use pre-computed bible_verse if available (simpler, more accurate)
+            // Use pre-computed bible_verse field (now properly formatted)
             if (article.bible_verse) {
                 // bible_verse can be a string or an array
                 const verseRef = Array.isArray(article.bible_verse) ? article.bible_verse[0] : article.bible_verse;
-                return String(verseRef).split(' ')[0];  // Just the book name part
+                // Extract book name: everything before the last space before "chapter:verse"
+                // Pattern: optional number + words (allowing lowercase) + chapter:verse
+                const match = String(verseRef).match(/^(?:\d+\s+)?[A-Z][A-Za-z]+(?:[ \-'][A-Za-z]+)*\s+\d+:\d+/);
+                if (match) {
+                    const fullRef = match[0];
+                    const lastSpace = fullRef.lastIndexOf(' ');
+                    return fullRef.substring(0, lastSpace);
+                }
+                // Fallback to first word if pattern doesn't match
+                return String(verseRef).split(' ')[0];
             }
 
             // Fallback to title parsing if bible_verse not available
             const title = article.title || '';
-            let book = 'Unknown';
-            let match;
-
-            // Try to find any book name at start of title
-            match = title.match(/^([A-Z\d][A-Za-z\s]+?)\s+\d+:/);
+            // Find book reference in the title, handling various formats:
+            // - "2 Kings 22:14" (numbered books like 1, 2, 3)
+            // - "Genesis 1:1" (single word book)
+            // - "Song of Solomon 1:1" (multi-word book)
+            // The pattern is: (number? BookName[s]) chapter:verse
+            // BookName starts with uppercase letter and can have multiple words
+            let match = title.match(/(\d+ [A-Z][A-Za-z]+(?:[ \-]?[A-Z][A-Za-z]+)*)\s+\d+:/);
+            if (!match) {
+                // Try non-numbered books (e.g., "Genesis 1:1", "Song of Solomon 1:1")
+                match = title.match(/([A-Z][A-Za-z]+(?:[ \-]?[A-Z][A-Za-z]+)*)\s+\d+:/);
+            }
             if (match) {
-                book = match[1].trim();
+                let book = match[1].trim();
+                // Normalize Psalm to Psalms
+                if (book === 'Psalm') book = 'Psalms';
+                return book;
             }
 
-            // Normalize Psalm to Psalms
-            if (book === 'Psalm') book = 'Psalms';
-
-            return book;
+            return 'Unknown';
         }
 
         function buildBibleDifficultiesList() {
