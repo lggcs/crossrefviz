@@ -173,6 +173,9 @@
             transform: scale(0.95);
         }
     </style>
+    <style id="presentation-styles">
+      !PRESENTATION_STYLES!
+    </style>
 </head>
 <body class="bg-gray-900 text-gray-100 h-screen flex flex-col">
     <!-- Overlay for mobile drawers -->
@@ -217,8 +220,14 @@
                        class="w-20 sm:w-24 h-2 bg-gray-700 rounded-lg cursor-pointer">
                 <span id="arc-value" class="text-xs w-8">500</span>
             </div>
-            <input type="text" id="search-input" placeholder="Search (e.g., John 3:16, Gen 1:1-3)... "
-                   class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 w-24 sm:w-48 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button onclick="openPresentation('creed')" class="text-xs bg-gray-700 hover:bg-blue-600 px-2 sm:px-3 py-1.5 rounded border border-gray-600 hover:border-blue-500 text-blue-400 hover:text-white transition-colors whitespace-nowrap">
+                Nicene Creed
+            </button>
+            <button onclick="openPresentation('prophecy')" class="text-xs bg-gray-700 hover:bg-blue-600 px-2 sm:px-3 py-1.5 rounded border border-gray-600 hover:border-blue-500 text-blue-400 hover:text-white transition-colors whitespace-nowrap">
+                Prophecies
+            </button>
+            <input type="text" id="search-input" placeholder="Search... "
+                   class="bg-gray-700 text-gray-100 text-xs rounded px-2 py-1 w-24 sm:w-32 focus:outline-none focus:ring-2 focus:ring-blue-500">
             <button onclick="toggleHelp()" class="text-gray-400 hover:text-blue-300 transition-colors" title="Help">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
@@ -246,7 +255,6 @@
                     <h3 class="font-semibold text-gray-100 mb-1">What You're Viewing</h3>
                     <p class="leading-relaxed">Thousands of Bible cross-references mapped to Rainbow-colored themes. Each arc shows a connection between two verses, colored by the dominant theme of the source verse.</p>
                 </div>
-
                 <div>
                     <h3 class="font-semibold text-gray-100 mb-1">Navigate Visualization</h3>
                     <ul class="space-y-1 ml-4 list-disc">
@@ -256,7 +264,6 @@
                         <li><strong>Use keyboard arrows</strong> ← → for quick navigation</li>
                     </ul>
                 </div>
-
                 <div>
                     <h3 class="font-semibold text-gray-100 mb-1">View Details</h3>
                     <ul class="space-y-1 ml-4 list-disc">
@@ -265,27 +272,38 @@
                         <li><strong>Bible Difficulties</strong> appear below arcs when scrolled</li>
                     </ul>
                 </div>
-
                 <div>
-                    <h3 class="font-semibold text-gray-100 mb-1">Rainbow Themes</h3>
-                    <p class="leading-relaxed">Each color represents a theological theme (e.g., God=blue, Creation=green, Redemption=purple). Filter by theme using the sidebar.</p>
+                    <h3 class="font-semibold text-gray-100 mb-1">Presentations</h3>
+                    <ul class="space-y-1 ml-4 list-disc">
+                        <li><strong>Nicene Creed</strong> - 16-slide presentation with correlating KJV scriptures</li>
+                        <li><strong>Prophecies</strong> - 18 messianic prophecies with fulfillment verses</li>
+                    </ul>
                 </div>
-
                 <div>
                     <h3 class="font-semibold text-gray-100 mb-1">Controls</h3>
                     <ul class="space-y-1 ml-4 list-disc">
                         <li><strong>Votes slider</strong> — filter cross-references by community votes</li>
                         <li><strong>Arcs slider</strong> — limit number of visible arcs</li>
-                        <li><strong>Search</strong> — find books (e.g., "Genesis") or verses (e.g., "John 3:16", "Gen 1:1-3")</li>
-                        <li><strong>Verse search</strong> — finds verse + all connected cross-references (shows relevant arcs only)</li>
-                        <li><strong>Source filters</strong> — toggle Bible difficulties by source</li>
+                        <li><strong>Search</strong> — find books or verses</li>
                     </ul>
                 </div>
-
                 <div class="pt-2 border-t border-gray-700">
                     <p class="text-gray-500 italic">Use the <kbd class="bg-gray-700 px-1.5 py-0.5 rounded text-[10px]">?</kbd> button to show/hide this help</p>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Presentation Overlay -->
+    <div id="presentation-overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] hidden">
+        <button onclick="closePresentation()" class="absolute top-4 right-4 z-50 w-10 h-10 bg-gray-800/90 hover:bg-gray-700 border border-gray-600 rounded-full flex items-center justify-center text-white transition-all hover:scale-110" title="Close presentation">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+        <div id="presentation-content" class="w-full h-full overflow-auto">
+            <!-- Presentation content will be injected here -->
         </div>
     </div>
 
@@ -2848,6 +2866,273 @@
                 requestAnimationFrame(animate);
             }
             animate();
-        </script>
-    </body>
+    </script>
+
+    <script src="presentation_data.js"></script>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // Presentation overlay management
+            let presentationContent = '';
+            let cleanupFunction = null;
+
+            function openPresentation(type) {
+                const overlay = document.getElementById('presentation-overlay');
+                const contentDiv = document.getElementById('presentation-content');
+                const stylesElement = document.getElementById('presentation-styles');
+
+                // Show overlay
+                overlay.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+
+                // Load presentation styles and content
+                if (type === 'creed') {
+                    stylesElement.textContent = PRESENTATION_STYLES;
+                    presentationContent = `
+                        <div class="bg-animation"></div>
+                        <div class="particles" id="creed-particles"></div>
+                        <div class="main-container">
+                          <div class="title">Nicene Creed</div>
+                          <div class="creed-container">
+                            <div class="slide-container" id="creed-slideContainer">${creedSlidesHTML}</div>
+                            <div class="progress-container" id="creed-progressContainer"></div>
+                            <div class="nav-buttons">
+                              <button class="nav-btn" id="creed-prevBtn">← Previous</button>
+                              <button class="nav-btn pause-btn" id="creed-pauseBtn">Pause</button>
+                              <button class="nav-btn" id="creed-nextBtn">Next →</button>
+                            </div>
+                            <div class="footer">"Jesus answered them, and said, My doctrine is not mine, but his that sent me." - John 7:16</div>
+                          </div>
+                        </div>
+                    `;
+                    contentDiv.innerHTML = presentationContent;
+                    initCreedPresentation();
+                } else if (type === 'prophecy') {
+                    stylesElement.textContent = PRESENTATION_STYLES;
+                    presentationContent = `
+                        <div class="bg-animation"></div>
+                        <div class="particles" id="prophecy-particles"></div>
+                        <div class="main-container">
+                          <div class="title">Messianic Prophecies</div>
+                          <div class="creed-container">
+                            <div class="slide-container" id="prophecy-slideContainer">${prophecySlidesHTML}</div>
+                            <div class="progress-container" id="prophecy-progressContainer"></div>
+                            <div class="nav-buttons">
+                              <button class="nav-btn" id="prophecy-prevBtn">← Previous</button>
+                              <button class="nav-btn pause-btn" id="prophecy-pauseBtn">Pause</button>
+                              <button class="nav-btn" id="prophecy-nextBtn">Next →</button>
+                            </div>
+                            <div class="footer">"Search the scriptures; for in them ye think ye have eternal life: and they are they which testify of me." - John 5:39</div>
+                          </div>
+                        </div>
+                    `;
+                    contentDiv.innerHTML = presentationContent;
+                    initProphecyPresentation();
+                }
+            }
+
+            function closePresentation() {
+                const overlay = document.getElementById('presentation-overlay');
+                const contentDiv = document.getElementById('presentation-content');
+                const stylesElement = document.getElementById('presentation-styles');
+
+                // Clean up presentation interval if exists
+                if (cleanupFunction) {
+                    cleanupFunction();
+                    cleanupFunction = null;
+                }
+
+                // Clear content and styles
+                contentDiv.innerHTML = '';
+                stylesElement.textContent = '';
+
+                // Hide overlay
+                overlay.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+
+            // Initialize Nicene Creed presentation
+            function initCreedPresentation() {
+                initPresentation('creed');
+            }
+
+            // Initialize Prophecy presentation
+            function initProphecyPresentation() {
+                initPresentation('prophecy');
+            }
+
+            // Generic presentation initialization
+            function initPresentation(prefix) {
+                const SLIDE_DURATION = 12000;
+                let currentSlide = 0;
+                let slideInterval = null;
+                let isPaused = false;
+
+                const prefixLower = prefix.toLowerCase();
+                const slides = document.getElementById(prefixLower + '-slideContainer').querySelectorAll('.slide');
+                const progressContainer = document.getElementById(prefixLower + '-progressContainer');
+                const prevBtn = document.getElementById(prefixLower + '-prevBtn');
+                const nextBtn = document.getElementById(prefixLower + '-nextBtn');
+                const pauseBtn = document.getElementById(prefixLower + '-pauseBtn');
+                const particlesContainer = document.getElementById(prefixLower + '-particles');
+
+                if (!slides.length) {
+                    console.error('No slides found for', prefix);
+                    return;
+                }
+
+                // Create particles
+                for (let i = 0; i < 30; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.left = Math.random() * 100 + '%';
+                    particle.style.animationDelay = Math.random() * 8 + 's';
+                    particle.style.animationDuration = (6 + Math.random() * 4) + 's';
+                    particlesContainer.appendChild(particle);
+                }
+
+                // Create progress dots
+                slides.forEach((_, index) => {
+                    const dot = document.createElement('div');
+                    dot.className = 'progress-dot' + (index === 0 ? ' active' : '');
+                    dot.addEventListener('click', () => goToSlide(index));
+                    progressContainer.appendChild(dot);
+                });
+
+                function updateProgressDots() {
+                    const dots = progressContainer.querySelectorAll('.progress-dot');
+                    dots.forEach((dot, index) => {
+                        dot.classList.toggle('active', index === currentSlide);
+                    });
+                }
+
+                function showSlide(index) {
+                    slides.forEach((slide, i) => {
+                        slide.classList.toggle('active', i === index);
+                    });
+                }
+
+                function goToSlide(index) {
+                    if (index < 0) index = slides.length - 1;
+                    if (index >= slides.length) index = 0;
+
+                    currentSlide = index;
+                    showSlide(currentSlide);
+                    updateProgressDots();
+
+                    if (!isPaused) {
+                        resetInterval();
+                    }
+                }
+
+                function nextSlide() {
+                    goToSlide(currentSlide + 1);
+                }
+
+                function prevSlide() {
+                    goToSlide(currentSlide - 1);
+                }
+
+                function resetInterval() {
+                    if (slideInterval) {
+                        clearInterval(slideInterval);
+                    }
+                    slideInterval = setInterval(nextSlide, SLIDE_DURATION);
+                }
+
+                function togglePause() {
+                    isPaused = !isPaused;
+                    pauseBtn.textContent = isPaused ? 'Play' : 'Pause';
+                    pauseBtn.classList.toggle('paused', isPaused);
+
+                    if (isPaused) {
+                        clearInterval(slideInterval);
+                    } else {
+                        resetInterval();
+                    }
+                }
+
+                // Event listeners
+                const cleanupEvents = [];
+
+                const prevHandler = () => { prevSlide(); };
+                const nextHandler = () => { nextSlide(); };
+                const pauseHandler = () => { togglePause(); };
+
+                prevBtn.addEventListener('click', prevHandler);
+                nextBtn.addEventListener('click', nextHandler);
+                pauseBtn.addEventListener('click', pauseHandler);
+                cleanupEvents.push(() => { prevBtn.removeEventListener('click', prevHandler); });
+                cleanupEvents.push(() => { nextBtn.removeEventListener('click', nextHandler); });
+                cleanupEvents.push(() => { pauseBtn.removeEventListener('click', pauseHandler); });
+
+                // Keyboard navigation
+                const keyboardHandler = (e) => {
+                    if (e.key === 'ArrowRight' || e.key === ' ') {
+                        e.preventDefault();
+                        nextSlide();
+                    } else if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        prevSlide();
+                    } else if (e.key === 'p' || e.key === 'P') {
+                        togglePause();
+                    } else if (e.key === 'Escape') {
+                        closePresentation();
+                    }
+                };
+                document.addEventListener('keydown', keyboardHandler);
+                cleanupEvents.push(() => { document.removeEventListener('keydown', keyboardHandler); });
+
+                // Touch/swipe support
+                let touchStartX = 0;
+                let touchEndX = 0;
+
+                const touchStartHandler = (e) => {
+                    touchStartX = e.changedTouches[0].screenX;
+                };
+                const touchEndHandler = (e) => {
+                    touchEndX = e.changedTouches[0].screenX;
+                    handleSwipe();
+                };
+
+                document.addEventListener('touchstart', touchStartHandler, { passive: true });
+                document.addEventListener('touchend', touchEndHandler, { passive: true });
+                cleanupEvents.push(() => { document.removeEventListener('touchstart', touchStartHandler); });
+                cleanupEvents.push(() => { document.removeEventListener('touchend', touchEndHandler); });
+
+                function handleSwipe() {
+                    const swipeThreshold = 50;
+                    const diff = touchStartX - touchEndX;
+
+                    if (Math.abs(diff) > swipeThreshold) {
+                        if (diff > 0) {
+                            nextSlide();
+                        } else {
+                            prevSlide();
+                        }
+                    }
+                }
+
+                // Initialize
+                showSlide(0);
+                resetInterval();
+
+                // Cleanup function
+                cleanupFunction = () => {
+                    if (slideInterval) {
+                        clearInterval(slideInterval);
+                    }
+                    cleanupEvents.forEach(fn => fn());
+                };
+            }
+
+            // Make functions globally accessible
+            window.openPresentation = openPresentation;
+            window.closePresentation = closePresentation;
+        })();
+
+    </script>
+</body>
 </html>
