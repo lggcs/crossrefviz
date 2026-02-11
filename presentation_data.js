@@ -152,10 +152,23 @@ const PRESENTATION_STYLES = `
     font-weight: 700;
     margin-bottom: 0.75rem;
     line-height: 1.2;
+    /* Fallback color for browsers that don't support background-clip */
+    color: var(--accent-primary);
+    text-shadow: 0 0 20px var(--accent-glow);
     background: linear-gradient(135deg, #ffffff 0%, var(--accent-primary) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    position: relative;
+  }
+
+  /* Mobile override - use solid color for better compatibility */
+  @media (max-width: 768px) {
+    .slide-line {
+      -webkit-text-fill-color: var(--accent-primary);
+      background: none;
+      color: var(--accent-primary);
+    }
   }
 
   .slide-subline {
