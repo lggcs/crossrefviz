@@ -201,13 +201,13 @@
 
     <!-- Header -->
     <header class="bg-gray-800 border-b border-gray-700 px-3 py-2 flex items-center justify-between flex-shrink-0">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 mr-1 sm:mr-0">
             <h1 class="text-base sm:text-lg font-bold text-blue-400 truncate">Bible Cross-References</h1>
             <span class="text-xs text-gray-400 hidden sm:inline">
                 <span id="stats">Loading...</span>
             </span>
         </div>
-        <div class="flex items-center gap-2 sm:gap-4">
+        <div class="flex items-center gap-1 sm:gap-4">
             <div class="hidden sm:flex items-center gap-1 sm:gap-2">
                 <label class="text-xs text-gray-400">Votes:</label>
                 <input type="range" id="vote-threshold" min="1" max="50" value="5"
@@ -220,10 +220,10 @@
                        class="w-20 sm:w-24 h-2 bg-gray-700 rounded-lg cursor-pointer">
                 <span id="arc-value" class="text-xs w-8">500</span>
             </div>
-            <button onclick="openPresentation('creed')" class="text-xs sm:text-xs bg-gray-700 hover:bg-blue-600 px-1.5 py-1 sm:px-2 sm:py-1.5 rounded border border-gray-600 hover:border-blue-500 text-blue-400 hover:text-white transition-colors whitespace-nowrap">
+            <button onclick="openPresentation('creed')" class="text-[10px] sm:text-xs bg-gray-700 hover:bg-blue-600 px-1.5 py-0.5 sm:px-2 sm:py-1.5 rounded border border-gray-600 hover:border-blue-500 text-blue-400 hover:text-white transition-colors whitespace-nowrap">
                 Creed
             </button>
-            <button onclick="openPresentation('prophecy')" class="text-xs sm:text-xs bg-gray-700 hover:bg-blue-600 px-1.5 py-1 sm:px-2 sm:py-1.5 rounded border border-gray-600 hover:border-blue-500 text-blue-400 hover:text-white transition-colors whitespace-nowrap">
+            <button onclick="openPresentation('prophecy')" class="text-[10px] sm:text-xs bg-gray-700 hover:bg-blue-600 px-1.5 py-0.5 sm:px-2 sm:py-1.5 rounded border border-gray-600 hover:border-blue-500 text-blue-400 hover:text-white transition-colors whitespace-nowrap">
                 Prophecies
             </button>
             <input type="text" id="search-input" placeholder="Search... "

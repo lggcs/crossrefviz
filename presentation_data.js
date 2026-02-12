@@ -411,6 +411,15 @@ const PRESENTATION_STYLES = `
     .title {
       font-size: 1.3rem;
     }
+
+    .nav-buttons {
+      gap: 0.5rem;
+    }
+
+    .nav-btn {
+      padding: 0.6rem 1.5rem;
+      font-size: 0.75rem;
+    }
   }
 
   @media (max-width: 480px) {
@@ -433,13 +442,23 @@ const PRESENTATION_STYLES = `
     }
 
     .nav-buttons {
-      flex-direction: column;
-      align-items: center;
+      flex-direction: row;
+      gap: 0.5rem;
     }
 
     .nav-btn {
-      width: 100%;
-      max-width: 200px;
+      padding: 0.5rem 1rem;
+      font-size: 0.7rem;
+      min-width: auto;
+    }
+
+    .pause-btn {
+      min-width: 70px;
+    }
+
+    .prophecy-ref,
+    .fulfillment-ref {
+      font-size: 0.8rem;
     }
   }
 `;
